@@ -432,7 +432,7 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
     <div style={{ minHeight: "100vh", background: th.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, ...themeVars(tournament) }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ marginBottom: 10, display: "flex", justifyContent: "center" }}>{th.id === "masters" ? <TexasIcon size={52} color={th.accent} /> : <span style={{ fontSize: 52 }}>{th.emoji}</span>}</div>
+          <div style={{ marginBottom: 10, display: "flex", justifyContent: "center" }}>{tournament.id === "masters" ? <TexasIcon size={52} color={th.accent} /> : <span style={{ fontSize: 52 }}>{th.emoji}</span>}</div>
           <h1 style={{ fontSize: 26, color: th.accent, fontFamily: "Playfair Display, serif", marginBottom: 4 }}>Major Pick&apos;em</h1>
           <p style={{ color: th.creamDim, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase" }}>{tournament.shortName} {tournament.year}</p>
         </div>
