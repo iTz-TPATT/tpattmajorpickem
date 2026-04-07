@@ -447,29 +447,28 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* ── Photos Debug ── */}
+        {/* ── Course Photos Debug ── */}
         <div style={S.section}>
           <div style={S.sectionTitle}>🖼 Course Photos Debug</div>
           <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
-            Test what photos the Wikipedia API is returning for Augusta National.
+            Verify course photos are loading. Should return 4 photos for Masters.
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-            <button onClick={async () => {
-              setPhotoDebug("Fetching...");
-              try {
-                const res = await fetch("/api/course-photos?tournament=masters&bust=1");
-                const data = await res.json();
-                if (!data.photos || data.photos.length === 0) {
-                  setPhotoDebug("❌ No photos returned. Source: " + (data.source ?? "unknown"));
-                } else {
-                  const preview = data.photos.map((p: {url: string; caption: string}, i: number) =>
-                    `Photo ${i+1}: ${p.caption} | URL: ${p.url.slice(0, 80)}...`
-                  ).join("\n");
-                  setPhotoDebug(`✓ ${data.photos.length} photos found (${data.source}):\n${preview}`);
-                }
-              } catch { setPhotoDebug("❌ Network error"); }
-            }} style={S.btn("blue")}>🔍 Test Masters Photos</button>
-          </div>
+          <button onClick={async () => {
+            setPhotoDebug("Fetching...");
+            try {
+              const res = await fetch("/api/course-photos?tournament=masters");
+              const data = await res.json();
+              const count = data.photos?.length ?? 0;
+              const source = data.source ?? "unknown";
+              if (count === 0) {
+                setPhotoDebug(`❌ 0 photos. Source: ${source}`);
+              } else {
+                const urls = data.photos.map((p: {url:string;caption:string}, i:number) =>
+                  `${i+1}. ${p.caption}\n   ${p.url}`).join("\n\n");
+                setPhotoDebug(`✓ ${count} photos (${source}):\n\n${urls}`);
+              }
+            } catch(e) { setPhotoDebug("❌ Error: " + String(e)); }
+          }} style={S.btn("blue")}>🔍 Test Masters Photos</button>
           {photoDebug && (
             <pre style={{ marginTop: 12, padding: "10px 14px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 6, fontSize: 11, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-wrap" as const, wordBreak: "break-all" as const }}>
               {photoDebug}

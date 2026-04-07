@@ -9,6 +9,9 @@ const ALLOWED_HOSTS = [
   "commons.wikimedia.org",
   "images.unsplash.com",
   "en.wikipedia.org",
+  "picsum.photos",
+  "fastly.picsum.photos",
+  "i.picsum.photos",
 ];
 
 export async function GET(request: Request) {
