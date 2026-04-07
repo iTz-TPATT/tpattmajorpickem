@@ -27,15 +27,6 @@ interface Overrides {
   useManualScores?: boolean;
 }
 
-// Fixed button styles (No duplicate border property)
-const getBtnStyles = (color: string): React.CSSProperties => ({
-  padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
-  fontFamily: "monospace", fontWeight: 700,
-  background: color === "green" ? "#1a3a1a" : color === "red" ? "#3a1a1a" : color === "yellow" ? "#3a3010" : "#1a1a2a",
-  color: color === "green" ? "#5dba7e" : color === "red" ? "#e07b6f" : color === "yellow" ? "#f0c040" : "#8facd4",
-  border: `1px solid ${color === "green" ? "#3a6a3a" : color === "red" ? "#6a2a2a" : color === "yellow" ? "#6a5020" : "#2a3a5a"}`,
-});
-
 const S: Record<string, React.CSSProperties | ((arg: boolean) => React.CSSProperties)> = {
   page: { minHeight: "100vh", background: "#0a0a0a", color: "#e0e0e0", fontFamily: "monospace", padding: 0 },
   header: { background: "#111", borderBottom: "1px solid #333", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
@@ -58,6 +49,13 @@ const S: Record<string, React.CSSProperties | ((arg: boolean) => React.CSSProper
     background: "#1a1a1a", border: "1px solid #444", color: "#e0e0e0",
     padding: "6px 10px", borderRadius: 6, fontSize: 14, cursor: "pointer",
   },
+  btn: (color: string): React.CSSProperties => ({
+    padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
+    fontFamily: "monospace", fontWeight: 700,
+    background: color === "green" ? "#1a3a1a" : color === "red" ? "#3a1a1a" : color === "yellow" ? "#3a3010" : "#1a1a2a",
+    color: color === "green" ? "#5dba7e" : color === "red" ? "#e07b6f" : color === "yellow" ? "#f0c040" : "#8facd4",
+    border: `1px solid ${color === "green" ? "#3a6a3a" : color === "red" ? "#6a2a2a" : color === "yellow" ? "#6a5020" : "#2a3a5a"}`,
+  }),
   scoreInput: {
     width: 60, background: "#1a1a1a", border: "1px solid #444", color: "#e0e0e0",
     padding: "4px 8px", borderRadius: 4, fontSize: 13, fontFamily: "monospace", textAlign: "center" as const,
@@ -209,7 +207,7 @@ export default function AdminPage() {
             placeholder="Admin password" autoFocus
             style={{ ...S.scoreInput, width: "100%", padding: "10px 12px", marginBottom: 14, fontSize: 15 }}
           />
-          <button onClick={tryAuth} style={{ ...getBtnStyles("yellow"), width: "100%", padding: "10px", fontSize: 15 }}>
+          <button onClick={tryAuth} style={{ ...S.btn("yellow"), width: "100%", padding: "10px", fontSize: 15 }}>
             Sign In
           </button>
         </div>
@@ -228,7 +226,7 @@ export default function AdminPage() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <span style={S.badge}>● LIVE</span>
-          <a href="/" style={{ ...getBtnStyles("blue"), textDecoration: "none", fontSize: 12 }}>← Back to App</a>
+          <a href="/" style={{ ...S.btn("blue"), textDecoration: "none", fontSize: 12 }}>← Back to App</a>
         </div>
       </div>
 
@@ -282,14 +280,14 @@ export default function AdminPage() {
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" as const }}>
-            <button onClick={fillRandomScores} style={getBtnStyles("blue")}>🎲 Fill Random Scores</button>
-            <button onClick={async () => { const ok = await call("wipe_picks", { tournament: selectedTournament }); if (ok) showMsg("All test picks wiped"); }} style={getBtnStyles("red")}>
+            <button onClick={fillRandomScores} style={S.btn("blue")}>🎲 Fill Random Scores</button>
+            <button onClick={async () => { const ok = await call("wipe_picks", { tournament: selectedTournament }); if (ok) showMsg("All test picks wiped"); }} style={S.btn("red")}>
               🗑 Wipe All Picks
             </button>
-            <button onClick={async () => { const ok = await call("clear_overrides"); if (ok) { setOverrides({}); showMsg("All overrides cleared — back to real mode"); }}} style={getBtnStyles("yellow")}>
+            <button onClick={async () => { const ok = await call("clear_overrides"); if (ok) { setOverrides({}); showMsg("All overrides cleared — back to real mode"); }}} style={S.btn("yellow")}>
               ↺ Clear All Overrides
             </button>
-            <button onClick={async () => { const ok = await call("clear_score_cache"); if (ok) showMsg("Score cache cleared — ESPN will re-fetch"); }} style={getBtnStyles("green")}>
+            <button onClick={async () => { const ok = await call("clear_score_cache"); if (ok) showMsg("Score cache cleared — ESPN will re-fetch"); }} style={S.btn("green")}>
               🔄 Force ESPN Re-fetch
             </button>
           </div>
@@ -335,7 +333,7 @@ export default function AdminPage() {
             })}
           </div>
 
-          <button onClick={saveScores} disabled={saving} style={{ ...getBtnStyles("green"), marginTop: 16, padding: "10px 24px", fontSize: 14, opacity: saving ? 0.6 : 1 }}>
+          <button onClick={saveScores} disabled={saving} style={{ ...S.btn("green"), marginTop: 16, padding: "10px 24px", fontSize: 14, opacity: saving ? 0.6 : 1 }}>
             {saving ? "Saving…" : "💾 Save Scores"}
           </button>
         </div>
@@ -405,7 +403,7 @@ export default function AdminPage() {
           </div>
 
           <button onClick={submitProxyPicks} disabled={saving || proxyPicks.length !== 3 || !proxyUser}
-            style={{ ...getBtnStyles("green"), padding: "10px 24px", fontSize: 14, opacity: (saving || proxyPicks.length !== 3 || !proxyUser) ? 0.5 : 1 }}>
+            style={{ ...S.btn("green"), padding: "10px 24px", fontSize: 14, opacity: (saving || proxyPicks.length !== 3 || !proxyUser) ? 0.5 : 1 }}>
             {saving ? "Submitting…" : "Submit Picks on Their Behalf"}
           </button>
         </div>
