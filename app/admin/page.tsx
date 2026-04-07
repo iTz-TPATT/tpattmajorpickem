@@ -29,7 +29,7 @@ interface Overrides {
 
 // 1. EXTRACTED BUTTON STYLES HERE
 const getBtnStyles = (color: string): React.CSSProperties => ({
-  padding: "8px 16px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13,
+  padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
   fontFamily: "monospace", fontWeight: 700,
   background: color === "green" ? "#1a3a1a" : color === "red" ? "#3a1a1a" : color === "yellow" ? "#3a3010" : "#1a1a2a",
   color: color === "green" ? "#5dba7e" : color === "red" ? "#e07b6f" : color === "yellow" ? "#f0c040" : "#8facd4",
