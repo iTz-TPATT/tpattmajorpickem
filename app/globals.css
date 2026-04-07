@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root {
+  --green-deep:   #071510;
+  --green-dark:   #0f2318;
+  --green-mid:    #1a3a28;
+  --green-light:  #2a5a40;
+  --gold:         #c9a84c;
+  --gold-light:   #e2c97e;
+  --cream:        #f0e9d6;
+  --cream-dim:    #c8bfa8;
+  --white:        #ffffff;
+  --red:          #c0392b;
+  --card-bg:      rgba(255,255,255,0.04);
+  --card-border:  rgba(201,168,76,0.18);
+  --radius:       10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--green-deep);
+  color: var(--cream);
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 16px;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+button {
+  cursor: pointer;
+  font-family: 'EB Garamond', Georgia, serif;
+}
+
+input {
+  font-family: 'EB Garamond', Georgia, serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--green-dark); }
+::-webkit-scrollbar-thumb { background: var(--green-light); border-radius: 3px; }
