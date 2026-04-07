@@ -75,7 +75,6 @@ export const PLAYER_SEASON_STATS: Record<string, PlayerSeasonStats> = {
   "Sepp Straka":        { worldRank:33, scoringAvg:70.22, drivingDist:303, fairwayPct:61.9, girPct:69.9, puttsPerRound:29.2, sgOTT:0.32, sgAPP:0.56, sgARG:0.06, sgPUTT:-0.08, sgTotal:0.86 },
   "Jason Day":          { worldRank:35, scoringAvg:70.28, drivingDist:305, fairwayPct:60.1, girPct:70.2, puttsPerRound:28.8, sgOTT:0.44, sgAPP:0.52, sgARG:0.08, sgPUTT:0.22, sgTotal:1.26 },
   "Corey Conners":      { worldRank:40, scoringAvg:70.36, drivingDist:297, fairwayPct:67.4, girPct:70.8, puttsPerRound:29.3, sgOTT:0.08, sgAPP:0.62, sgARG:0.06, sgPUTT:-0.14, sgTotal:0.62 },
-  "Jordan Spieth":      { worldRank:20, scoringAvg:69.94, drivingDist:299, fairwayPct:62.4, girPct:70.8, puttsPerRound:28.1, sgOTT:0.24, sgAPP:0.68, sgARG:0.28, sgPUTT:0.38, sgTotal:1.58 },
   "Bubba Watson":       { worldRank:110,scoringAvg:71.42, drivingDist:309, fairwayPct:52.1, girPct:66.4, puttsPerRound:29.9, sgOTT:0.62, sgAPP:-0.12, sgARG:-0.08, sgPUTT:-0.18, sgTotal:0.24 },
   "Phil Mickelson":     { worldRank:95, scoringAvg:71.18, drivingDist:298, fairwayPct:53.8, girPct:65.1, puttsPerRound:30.1, sgOTT:0.18, sgAPP:-0.08, sgARG:0.18, sgPUTT:-0.22, sgTotal:0.06 },
   "Talor Gooch":        { worldRank:46, scoringAvg:70.45, drivingDist:305, fairwayPct:60.9, girPct:69.0, puttsPerRound:29.4, sgOTT:0.44, sgAPP:0.42, sgARG:0.04, sgPUTT:-0.10, sgTotal:0.80 },
