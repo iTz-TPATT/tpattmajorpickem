@@ -318,7 +318,7 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
 
 // ─── Course Hero ──────────────────────────────────────────────────────────────
 function CourseHero({ tournament }: { tournament: Tournament }) {
-  const [photos, setPhotos] = useState<{ url: string; caption: string }[]>([]);
+  const [photos, setPhotos] = useState<{ url: string; fallbackUrl?: string; caption: string }[]>([]);
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -376,10 +376,16 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
           src={photo.url}
           alt={photo.caption}
           onLoad={() => setLoaded(true)}
-          onError={() => {
-            // Skip bad image, try next
-            setPhotos(prev => prev.filter((_, i) => i !== idx));
-            setIdx(0);
+          onError={(e) => {
+            const fb = photos[idx]?.fallbackUrl;
+            if (fb && (e.target as HTMLImageElement).src !== fb) {
+              // Try picsum fallback before giving up
+              (e.target as HTMLImageElement).src = fb;
+            } else {
+              // Both failed — remove and move on
+              setPhotos(prev => prev.filter((_, i) => i !== idx));
+              setIdx(0);
+            }
           }}
           style={{
             position: "absolute", inset: 0,

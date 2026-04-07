@@ -1,33 +1,45 @@
 import { NextResponse } from "next/server";
 
-// picsum.photos uses seeded stable IDs - same seed = same photo always
-// These are beautiful outdoor/landscape photos, free, no hotlinking restrictions
-// Direct browser-loadable URLs, no proxy needed
-
-const PHOTOS: Record<string, { url: string; caption: string }[]> = {
+// All Masters photos from /public/images/
+const PHOTOS: Record<string, { file: string; caption: string }[]> = {
   masters: [
-    { url: "https://picsum.photos/seed/augusta1/1400/500", caption: "Augusta National Golf Club · Augusta, Georgia" },
-    { url: "https://picsum.photos/seed/augusta2/1400/500", caption: "Amen Corner · Augusta National" },
-    { url: "https://picsum.photos/seed/masters3/1400/500", caption: "The Masters Tournament · Augusta, Georgia" },
-    { url: "https://picsum.photos/seed/augusta4/1400/500", caption: "Augusta National Golf Club" },
+    { file: "augusta-hole-12-amen-corner.jpg",  caption: "Amen Corner — Hole 12 · Augusta National" },
+    { file: "augusta-course-layout.jpg",         caption: "Augusta National Golf Club · Augusta, Georgia" },
+    { file: "masters-course-scenic.jpg",         caption: "The Masters Tournament · Augusta National" },
+    { file: "masters-tee-shot-crowd.jpg",        caption: "Masters Week · Augusta National" },
+    { file: "masters-leaderboard.jpg",           caption: "Masters Leaderboard · Augusta National" },
+    { file: "masters-player-celebration.jpg",    caption: "Champions Corner · The Masters" },
   ],
   pga: [
-    { url: "https://picsum.photos/seed/quailhollow1/1400/500", caption: "Quail Hollow Club · Charlotte, North Carolina" },
-    { url: "https://picsum.photos/seed/quailhollow2/1400/500", caption: "The Green Mile · Quail Hollow Club" },
+    { file: "pga1.jpg", caption: "Quail Hollow Club · Charlotte, North Carolina" },
   ],
   usopen: [
-    { url: "https://picsum.photos/seed/oakmont1/1400/500", caption: "Oakmont Country Club · Oakmont, Pennsylvania" },
-    { url: "https://picsum.photos/seed/oakmont2/1400/500", caption: "Church Pew Bunkers · Oakmont" },
+    { file: "usopen1.jpg", caption: "Oakmont Country Club · Oakmont, Pennsylvania" },
   ],
   theopen: [
-    { url: "https://picsum.photos/seed/portrush1/1400/500", caption: "Royal Portrush Golf Club · Portrush, N. Ireland" },
-    { url: "https://picsum.photos/seed/portrush2/1400/500", caption: "Dunluce Links · Royal Portrush" },
+    { file: "theopen1.jpg", caption: "Royal Portrush Golf Club · Portrush, N. Ireland" },
   ],
+};
+
+const PICSUM_FALLBACKS: Record<string, string[]> = {
+  masters:  ["augusta1","augusta2","augusta3","augusta4","augusta5","augusta6"],
+  pga:      ["charlotte-golf1","charlotte-golf2"],
+  usopen:   ["oakmont-golf1","oakmont-golf2"],
+  theopen:  ["portrush-golf1","portrush-golf2"],
 };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tournament = searchParams.get("tournament") ?? "masters";
-  const photos = PHOTOS[tournament] ?? PHOTOS.masters;
-  return NextResponse.json({ photos, source: "picsum", count: photos.length });
+
+  const entries = PHOTOS[tournament] ?? PHOTOS.masters;
+  const fallbacks = PICSUM_FALLBACKS[tournament] ?? PICSUM_FALLBACKS.masters;
+
+  const photos = entries.map((entry, i) => ({
+    url: `/images/${entry.file}`,
+    fallbackUrl: `https://picsum.photos/seed/${fallbacks[i] ?? "golf" + i}/1400/500`,
+    caption: entry.caption,
+  }));
+
+  return NextResponse.json({ photos, source: "local" });
 }
