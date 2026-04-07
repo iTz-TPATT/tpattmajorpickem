@@ -6,7 +6,7 @@ Add your golf course photos here. Filenames must match exactly:
 - masters1.jpg — 12th hole / Golden Bell / any Augusta hole
 - masters2.jpg — Amen Corner or 11th/12th/13th
 - masters3.jpg — 16th hole Redbud or aerial
-- masters4.jpg — Any Augusta landscape
+
 
 ## PGA Championship (Quail Hollow)
 - pga1.jpg — Any Quail Hollow hole
