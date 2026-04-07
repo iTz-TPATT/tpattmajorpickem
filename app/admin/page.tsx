@@ -27,7 +27,7 @@ interface Overrides {
   useManualScores?: boolean;
 }
 
-// 1. EXTRACTED BUTTON STYLES HERE
+// Fixed button styles (No duplicate border property)
 const getBtnStyles = (color: string): React.CSSProperties => ({
   padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
   fontFamily: "monospace", fontWeight: 700,
