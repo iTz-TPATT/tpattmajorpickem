@@ -5,10 +5,9 @@ import { NextResponse } from "next/server";
 
 const PHOTOS: Record<string, { file: string; caption: string }[]> = {
   masters: [
-    { file: "masters-logo.jpg",              caption: "The Azaleas · Augusta National Golf Club" },
-    { file: "masters-pond.jpg",              caption: "Amen Corner · Augusta National" },
-    { file: "masters-leaderboard.jpg",       caption: "Augusta National Golf Club · Augusta, Georgia" },
-    { file: "masters-tee-shot-crowd (6).jpg", caption: "Masters Week · Augusta National" },
+    { file: "masters-logo.jpg",        caption: "The Azaleas · Augusta National Golf Club" },
+    { file: "masters-pond.jpg",        caption: "Amen Corner · Augusta National" },
+    { file: "masters-leaderboard.jpg", caption: "Augusta National Golf Club · Augusta, Georgia" },
   ],
   // ── Future majors — upload photos and uncomment ──────────────────────────
   // pga: [

@@ -48,8 +48,9 @@ function parseESPN(data: unknown): GolferScore[] {
 
 async function fetchFromESPN(): Promise<GolferScore[]> {
   const urls = [
-    "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
     "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
   ];
   for (const url of urls) {
     try {

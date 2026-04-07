@@ -13,11 +13,58 @@ interface GolferScore {
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
 }
-type Tab = "picks" | "leaderboard" | "history";
+type Tab = "picks" | "leaderboard" | "history" | "course";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function normalizeName(name: string): string {
   return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function avatarUrl(username: string): string {
+  // Convert "Trenton Patterson" -> "/avatars/trenton-patterson.jpg"
+  const slug = username.trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, "-");
+  return `/avatars/${slug}.jpg`;
+}
+
+function PlayerAvatar({ username, size = 32, style }: {
+  username: string;
+  size?: number;
+  style?: React.CSSProperties;
+}) {
+  const [failed, setFailed] = useState(false);
+  const initials = username.trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? "").slice(0, 2).join("");
+  // Generate a consistent color from the username
+  const hue = username.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      overflow: "hidden", flexShrink: 0, position: "relative",
+      background: `hsl(${hue}, 45%, 30%)`,
+      border: "1px solid rgba(255,255,255,0.15)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      ...style,
+    }}>
+      {!failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl(username)}
+          alt={username}
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }}
+        />
+      ) : (
+        <span style={{ fontSize: size * 0.38, color: "rgba(255,255,255,0.85)", fontFamily: "Playfair Display, serif", fontWeight: 600, userSelect: "none" }}>
+          {initials}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function fmtScore(n: number | null | undefined): string {
@@ -74,6 +121,138 @@ function scoreColor(n: number | null): string {
   return "var(--cream)";
 }
 
+
+// ─── Course Data ──────────────────────────────────────────────────────────────
+interface HoleInfo {
+  hole: number; name: string; par: number; yards: number;
+  description: string; notes: string;
+}
+
+const COURSE_DATA: Record<string, { name: string; location: string; par: number; yards: number; holes: HoleInfo[] }> = {
+  masters: {
+    name: "Augusta National Golf Club",
+    location: "Augusta, Georgia",
+    par: 72,
+    yards: 7510,
+    holes: [
+      { hole:1,  name:"Tea Olive",     par:4, yards:445, description:"Dogleg right downhill opener. Drive must avoid the fairway bunker on the right. Approach uphill to a narrow green with a ridge dividing it front to back.", notes:"Scoring hole — a par here settles the nerves." },
+      { hole:2,  name:"Pink Dogwood",  par:5, yards:575, description:"Long par-5 bending left. Second shot over a hill leaves a tricky downhill lie. The green is sharply contoured — two-putts from above the hole are dangerous.", notes:"Reachable in two but the green slopes severely." },
+      { hole:3,  name:"Flowering Peach",par:4,yards:350, description:"Short par-4 tempting aggressive drives. The small green is well-bunkered and sits above the fairway. A bump-and-run is often preferred over a high iron.", notes:"Shortest par-4 — birdie opportunity." },
+      { hole:4,  name:"Flowering Crab Apple",par:3,yards:240, description:"Long par-3 playing to a severely banked green. The left bunker is almost impossible; missing right leaves a chip back toward a steep fall-off.", notes:"One of the hardest par-3s on the PGA Tour." },
+      { hole:5,  name:"Magnolia",      par:4, yards:455, description:"Uphill par-4 with a fairway bunker at the landing zone. The green sits above the fairway with a ridge — front pin positions demand precise distance control.", notes:"Uphill all the way — plays longer than the card says." },
+      { hole:6,  name:"Juniper",       par:3, yards:180, description:"Downhill par-3 over a valley. The green slopes back-to-front — above the hole means a treacherous putt. Wind swirls unpredictably in the pines.", notes:"Distance club selection is critical." },
+      { hole:7,  name:"Pampas",        par:4, yards:450, description:"Short dogleg left requiring a precise tee shot. The tight green is guarded by bunkers and falls off sharply left. One of the most demanding approach shots on the course.", notes:"Tighter than it looks off the tee." },
+      { hole:8,  name:"Yellow Jasmine", par:5, yards:570, description:"Uphill par-5. Second shot over a ridge makes it nearly impossible to reach in two. Third shot to a crowned green — anything above the hole leaves a near-impossible putt.", notes:"Most three-putts on the course." },
+      { hole:9,  name:"Carolina Cherry",par:4, yards:460, description:"Downhill dogleg left with fairway bunkers flanking the driving zone. The approach plays downhill to a wildly sloping green — front and back pins are completely different challenges.", notes:"One of the most demanding approach shots at Augusta." },
+      { hole:10, name:"Camellia",      par:4, yards:495, description:"Opening hole of the back nine — sharp dogleg left downhill. Long hitters can cut the corner. The green is perched on a hillside and slopes dramatically from back to front.", notes:"Tee shot down the hill sets up everything." },
+      { hole:11, name:"White Dogwood", par:4, yards:520, description:"First hole of Amen Corner. Long par-4 with a pond guarding the left side of the green. The famous Sunday pin position dares players to attack — most end up in the water.", notes:"Where Masters are won and lost." },
+      { hole:12, name:"Golden Bell",   par:3, yards:155, description:"The most famous par-3 in golf. Rae's Creek runs in front; bunkers behind. Wind swirls from every direction in the trees. The green has almost no margin for error.", notes:"Never the same wind twice. Club selection is a guess." },
+      { hole:13, name:"Azalea",        par:5, yards:510, description:"Dogleg left par-5 that is the signature risk/reward hole. Rae's Creek crosses in front of the green — reaching in two requires carrying the creek and avoiding the left bunker. Azaleas bloom pink and red behind the green.", notes:"The most beautiful hole in golf. Go for it." },
+      { hole:14, name:"Chinese Fir",   par:4, yards:440, description:"Straight par-4 with no bunkers — unusual for Augusta. The challenge is entirely the green, which has several tiers and some of the most severe undulation on the course.", notes:"The green is the most treacherous on the course." },
+      { hole:15, name:"Firethorn",     par:5, yards:550, description:"Short par-5 reachable for almost everyone with a good drive. The pond in front of the green has claimed countless approach shots from players going for the eagle. Gateway to the famous back nine stretch.", notes:"Safe layup or aggressive attack — decide early." },
+      { hole:16, name:"Redbud",        par:3, yards:170, description:"Par-3 over water. The massive green allows creative shot-making — players often aim for the middle and let the slope feed the ball to the pin. The front-right Sunday pin is the most dramatic in golf.", notes:"When the Sunday pin is front-right, the gallery roars." },
+      { hole:17, name:"Nandina",       par:4, yards:440, description:"Dogleg right par-4. The green is long and narrow, running front-to-back on a plateau. An approach from the fairway bunker leaves a very difficult angle. The right side of the green drops off sharply.", notes:"Underestimated hole — subtle difficulties everywhere." },
+      { hole:18, name:"Holly",         par:4, yards:465, description:"Uphill closing par-4 in front of the iconic clubhouse. The fairway bunkers on the left demand a right-side tee shot. The elevated green has two tiers — above the hole means a downhill slider to close with.", notes:"The grandstand roar here is unlike anything in golf." },
+    ],
+  },
+};
+
+function getCourseData(tournamentId: string) {
+  return COURSE_DATA[tournamentId] ?? null;
+}
+
+// ─── Texas Icon ───────────────────────────────────────────────────────────────
+function TexasIcon({ size = 28, color = "white" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size * 0.85} viewBox="0 0 100 85" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M 8 2 L 62 2 L 62 8 L 70 8 L 70 14 L 76 14 L 76 20 L 82 20 L 82 28 L 88 28 L 88 36 L 94 36 L 94 48 L 88 48 L 88 54 L 82 60 L 76 62 L 70 68 L 64 72 L 58 78 L 52 82 L 48 80 L 44 76 L 38 70 L 30 66 L 22 60 L 16 54 L 10 46 L 6 38 L 4 30 L 4 22 L 6 14 L 8 8 Z"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.9"
+      />
+      {/* Panhandle notch */}
+      <path
+        d="M 8 2 L 8 14 L 4 14 L 4 22"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.9"
+      />
+    </svg>
+  );
+}
+
+// ─── Radar Chart ──────────────────────────────────────────────────────────────
+function RadarChart({ data, accent }: {
+  data: { label: string; value: number }[]; // value in SDs (-3 to 3)
+  accent: string;
+}) {
+  const size = 160;
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = 62;
+  const n = data.length;
+
+  function polar(angle: number, r: number) {
+    const a = (angle - 90) * (Math.PI / 180);
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function sdToR(sd: number) {
+    // Map -3..3 SDs to 0..maxR, center at maxR/2
+    return Math.max(4, Math.min(maxR, (sd + 3) / 6 * maxR));
+  }
+
+  const angleStep = 360 / n;
+  const points = data.map((d, i) => polar(i * angleStep, sdToR(d.value)));
+  const polygon = points.map(p => `${p.x},${p.y}`).join(" ");
+
+  // Grid rings at -2, -1, 0 (avg), +1, +2 SDs
+  const rings = [-2, -1, 0, 1, 2, 3].map(sd => sdToR(sd));
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {/* Grid rings */}
+      {rings.map((r, i) => (
+        <circle key={i} cx={cx} cy={cy} r={r}
+          fill="none" stroke={i === 2 ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)"}
+          strokeWidth={i === 2 ? 1 : 0.5} strokeDasharray={i === 2 ? "none" : "2,2"} />
+      ))}
+      {/* Spokes */}
+      {data.map((_, i) => {
+        const p = polar(i * angleStep, maxR);
+        return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.1)" strokeWidth={0.5} />;
+      })}
+      {/* Player polygon */}
+      <polygon points={polygon}
+        fill={accent} fillOpacity={0.25}
+        stroke={accent} strokeWidth={1.5} strokeLinejoin="round" />
+      {/* Dots at each vertex */}
+      {points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r={3} fill={accent} />
+      ))}
+      {/* Labels */}
+      {data.map((d, i) => {
+        const lp = polar(i * angleStep, maxR + 14);
+        const isLeft = lp.x < cx - 5;
+        return (
+          <text key={i} x={lp.x} y={lp.y + 4}
+            textAnchor={isLeft ? "end" : lp.x > cx + 5 ? "start" : "middle"}
+            fontSize={8.5} fill="rgba(255,255,255,0.65)" fontFamily="EB Garamond, serif">
+            {d.label}
+          </text>
+        );
+      })}
+      {/* Center "AVG" label */}
+      <text x={cx} y={cy + 3} textAnchor="middle" fontSize={7} fill="rgba(255,255,255,0.3)">AVG</text>
+    </svg>
+  );
+}
+
 // ─── Player Stats Tooltip ─────────────────────────────────────────────────────
 function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerName: string; visible: boolean }) {
   const [stats, setStats] = useState<Record<string, string> | null>(null);
@@ -81,40 +260,65 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
   const fetched = useRef(false);
 
   useEffect(() => {
-    // Require at least a player name — espnId may be empty outside tournament week
     if (!visible || fetched.current || !playerName) return;
     fetched.current = true;
     const params = new URLSearchParams({ name: playerName });
     if (espnId) params.set("espnId", espnId);
     fetch(`/api/stats?${params.toString()}`)
       .then((r) => r.json())
-      .then((d) => {
-        // d.stats is null when player not found — still update state so we stop showing "Loading"
-        setStats(d.stats ?? {});
-      })
+      .then((d) => { setStats(d.stats ?? {}); })
       .catch(() => { setFailed(true); setStats({}); });
   }, [visible, espnId, playerName]);
 
   if (!visible) return null;
 
+  // Build radar data from stats if available
+  const radarData = stats && stats["__radar__"] ? JSON.parse(stats["__radar__"]) : null;
+
   return (
     <div style={{
       position: "absolute", bottom: "110%", left: "50%", transform: "translateX(-50%)",
       background: "var(--bg-dark)", border: "1px solid var(--card-border)",
-      borderRadius: 8, padding: "10px 14px", zIndex: 100, minWidth: 180,
-      boxShadow: "0 8px 24px rgba(0,0,0,0.5)", pointerEvents: "none",
+      borderRadius: 10, padding: "12px 14px", zIndex: 100,
+      minWidth: radarData ? 340 : 200, maxWidth: 380,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.7)", pointerEvents: "none",
     }}>
       {!stats ? (
-        <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Loading stats…</div>
-      ) : failed || Object.keys(stats).length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic", padding: "4px 0" }}>Loading stats…</div>
+      ) : failed || Object.keys(stats).filter(k => !k.startsWith("__")).length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Stats unavailable</div>
       ) : (
-        Object.entries(stats).map(([k, v]) => (
-          <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 4, fontSize: 13 }}>
-            <span style={{ color: "var(--cream-dim)" }}>{k}</span>
-            <span style={{ color: "var(--cream)", fontWeight: 500 }}>{v}</span>
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          {/* Radar chart */}
+          {radarData && (
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ fontSize: 9, color: "var(--accent)", letterSpacing: "0.1em", textAlign: "center", marginBottom: 4, textTransform: "uppercase" }}>
+                Skill Profile
+              </div>
+              <RadarChart data={radarData} accent="var(--accent)" />
+              <div style={{ fontSize: 8, color: "rgba(255,255,255,0.3)", textAlign: "center", marginTop: 2 }}>
+                SDs from PGA avg · 2024-25
+              </div>
+            </div>
+          )}
+          {/* Stats list */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {Object.entries(stats).filter(([k]) => !k.startsWith("__")).map(([k, v]) => {
+              if (k.startsWith("──")) return (
+                <div key={k} style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.08em", marginTop: 8, marginBottom: 3, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 5 }}>
+                  {k.replace(/──/g, "").trim()}
+                </div>
+              );
+              if (v === "") return null;
+              return (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 3, fontSize: 12 }}>
+                  <span style={{ color: "var(--cream-dim)", whiteSpace: "nowrap" }}>{k}</span>
+                  <span style={{ color: "var(--cream)", fontWeight: 500, whiteSpace: "nowrap" }}>{v}</span>
+                </div>
+              );
+            })}
           </div>
-        ))
+        </div>
       )}
       <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "6px solid var(--card-border)" }} />
     </div>
@@ -153,7 +357,7 @@ function GolferCard({
         <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)" }}>
           {headshot ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={headshot} alt={name} width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            <img src={headshot} alt={name} width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           ) : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "var(--cream-dim)" }}>
               {name[0]}
@@ -228,7 +432,7 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
     <div style={{ minHeight: "100vh", background: th.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, ...themeVars(tournament) }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ fontSize: 52, marginBottom: 10 }}>{th.emoji}</div>
+          <div style={{ marginBottom: 10, display: "flex", justifyContent: "center" }}>{th.id === "masters" ? <TexasIcon size={52} color={th.accent} /> : <span style={{ fontSize: 52 }}>{th.emoji}</span>}</div>
           <h1 style={{ fontSize: 26, color: th.accent, fontFamily: "Playfair Display, serif", marginBottom: 4 }}>Major Pick&apos;em</h1>
           <p style={{ color: th.creamDim, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase" }}>{tournament.shortName} {tournament.year}</p>
         </div>
@@ -317,40 +521,50 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
 }
 
 // ─── Course Hero ──────────────────────────────────────────────────────────────
+const DISPLAY_MS = 6000;  // how long each photo shows
+const FADE_MS    = 800;   // fade duration — consistent for all photos
+
 function CourseHero({ tournament }: { tournament: Tournament }) {
   const [photos, setPhotos] = useState<{ url: string; fallbackUrl?: string; caption: string }[]>([]);
   const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const [opacity, setOpacity] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch photos on mount
   useEffect(() => {
     setPhotos([]);
     setIdx(0);
-    setLoaded(false);
+    setOpacity(0);
     fetch(`/api/course-photos?tournament=${tournament.id}`)
       .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d.photos) && d.photos.length > 0) {
-          setPhotos(d.photos);
-        }
-      })
+      .then(d => { if (Array.isArray(d.photos) && d.photos.length > 0) setPhotos(d.photos); })
       .catch(() => null);
   }, [tournament.id]);
 
-  // Auto-rotate
-  useEffect(() => {
-    if (photos.length <= 1) return;
-    const timer = setInterval(() => {
-      setVisible(false);
+  // Start rotation timer once photos are loaded and visible
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      // Fade out
+      setOpacity(0);
+      // After fade, advance index, then fade back in
       setTimeout(() => {
         setIdx(prev => (prev + 1) % photos.length);
-        setLoaded(false);
-        setVisible(true);
-      }, 500);
-    }, 7000);
-    return () => clearInterval(timer);
+        setTimeout(() => setOpacity(1), 50);
+      }, FADE_MS);
+    }, DISPLAY_MS);
   }, [photos.length]);
+
+  useEffect(() => {
+    if (photos.length > 1) startTimer();
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [idx, photos.length, startTimer]);
+
+  function goTo(i: number) {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setOpacity(0);
+    setTimeout(() => { setIdx(i); setTimeout(() => setOpacity(1), 50); }, FADE_MS);
+  }
 
   const photo = photos[idx] ?? null;
 
@@ -358,31 +572,21 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
     <div style={{
       position: "relative", width: "100%", height: 280,
       overflow: "hidden",
-      background: "linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-mid) 100%)",
+      background: "linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-dark) 40%, var(--bg-mid) 100%)",
     }}>
-      {/* Background gradient — always visible, looks intentional even without photo */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: `linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-dark) 40%, var(--bg-mid) 100%)`,
-        opacity: loaded ? 0 : 1,
-        transition: "opacity 0.7s ease",
-      }} />
-
-      {/* Photo — fades in once loaded */}
+      {/* Photo */}
       {photo && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={`${tournament.id}-${idx}`}
           src={photo.url}
           alt={photo.caption}
-          onLoad={() => setLoaded(true)}
+          onLoad={() => { setOpacity(1); startTimer(); }}
           onError={(e) => {
             const fb = photos[idx]?.fallbackUrl;
             if (fb && (e.target as HTMLImageElement).src !== fb) {
-              // Try picsum fallback before giving up
               (e.target as HTMLImageElement).src = fb;
             } else {
-              // Both failed — remove and move on
               setPhotos(prev => prev.filter((_, i) => i !== idx));
               setIdx(0);
             }
@@ -390,10 +594,9 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
           style={{
             position: "absolute", inset: 0,
             width: "100%", height: "100%",
-            objectFit: "cover",
-            objectPosition: "center 40%",
-            transition: "opacity 0.7s ease",
-            opacity: loaded && visible ? 1 : 0,
+            objectFit: "cover", objectPosition: "center 40%",
+            transition: `opacity ${FADE_MS}ms ease`,
+            opacity,
           }}
         />
       )}
@@ -405,12 +608,9 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
         pointerEvents: "none",
       }} />
 
-      {/* Tournament title overlay */}
-      <div style={{
-        position: "absolute", top: 20, left: 20,
-        display: "flex", alignItems: "center", gap: 10,
-      }}>
-        <span style={{ fontSize: 28 }}>{tournament.theme.emoji}</span>
+      {/* Tournament title */}
+      <div style={{ position: "absolute", top: 20, left: 20, display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ display: "inline-flex", alignItems: "center" }}>{tournament.id === "masters" ? <TexasIcon size={28} color={th.accent} /> : <span style={{ fontSize: 28 }}>{tournament.theme.emoji}</span>}</span>
         <div>
           <div style={{ fontSize: 15, color: "var(--accent)", fontFamily: "Playfair Display, serif", fontWeight: 600, lineHeight: 1.2 }}>
             {tournament.shortName} {tournament.year}
@@ -422,26 +622,18 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
       </div>
 
       {/* Caption + dots */}
-      <div style={{
-        position: "absolute", bottom: 12, left: 16, right: 16,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em", fontStyle: "italic" }}>
+      <div style={{ position: "absolute", bottom: 12, left: 16, right: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", letterSpacing: "0.06em", fontStyle: "italic" }}>
           {photo?.caption ?? ""}
         </span>
         {photos.length > 1 && (
           <div style={{ display: "flex", gap: 5 }}>
             {photos.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => { setVisible(false); setTimeout(() => { setIdx(i); setLoaded(false); setVisible(true); }, 300); }}
-                style={{
-                  width: 6, height: 6, borderRadius: "50%", border: "none",
-                  padding: 0, cursor: "pointer",
-                  background: i === idx ? "var(--accent)" : "rgba(255,255,255,0.35)",
-                  transition: "background 0.3s",
-                }}
-              />
+              <button key={i} onClick={() => goTo(i)} style={{
+                width: 6, height: 6, borderRadius: "50%", border: "none", padding: 0, cursor: "pointer",
+                background: i === idx ? "var(--accent)" : "rgba(255,255,255,0.35)",
+                transition: "background 0.3s",
+              }} />
             ))}
           </div>
         )}
@@ -771,6 +963,8 @@ function LeaderboardTab({
                 fontSize: 13, fontWeight: 700,
               }}>{i + 1}</div>
 
+              <PlayerAvatar username={u.username} size={36} />
+
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>{u.username}</div>
                 <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 2 }}>{roundsPlayed} round{roundsPlayed !== 1 ? "s" : ""} counted</div>
@@ -863,9 +1057,12 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
               return (
                 <div key={u.username} style={{ marginBottom: 18 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 15, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>
-                      {i === 0 && "🏅 "}{u.username}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <PlayerAvatar username={u.username} size={28} />
+                      <span style={{ fontSize: 15, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>
+                        {i === 0 && "🏅 "}{u.username}
+                      </span>
+                    </div>
                     <span style={{ fontFamily: "monospace", fontSize: 16, color: scoreColor(u.score) }}>{fmtScore(u.score)}</span>
                   </div>
                   {u.picks.map((g, pi) => {
@@ -897,6 +1094,116 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
           </div>
         );
       })}
+    </div>
+  );
+}
+
+
+// ─── Course Tab ───────────────────────────────────────────────────────────────
+function CourseTab({ tournament }: { tournament: Tournament }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const course = getCourseData(tournament.id);
+
+  if (!course) {
+    return (
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
+        <p style={{ color: "var(--cream-dim)", fontStyle: "italic" }}>Course guide coming soon for {tournament.shortName}.</p>
+      </div>
+    );
+  }
+
+  const parCounts = course.holes.reduce((acc, h) => { acc[h.par] = (acc[h.par] || 0) + 1; return acc; }, {} as Record<number, number>);
+
+  return (
+    <div>
+      {/* Course header card */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 10, padding: "20px 22px", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, color: "var(--accent)", fontFamily: "Playfair Display, serif", marginBottom: 4 }}>{course.name}</h2>
+        <p style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 16 }}>{course.location}</p>
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" as const }}>
+          {[
+            { label: "Par", value: course.par },
+            { label: "Yards", value: course.yards.toLocaleString() },
+            { label: "Par 3s", value: parCounts[3] || 0 },
+            { label: "Par 4s", value: parCounts[4] || 0 },
+            { label: "Par 5s", value: parCounts[5] || 0 },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 22, color: "var(--cream)", fontFamily: "Playfair Display, serif" }}>{value}</div>
+              <div style={{ fontSize: 11, color: "var(--cream-dim)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Hole scorecard strip */}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 10, padding: "14px 16px", marginBottom: 16, overflowX: "auto" as const }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(18, minmax(36px, 1fr))", gap: 3, minWidth: 600 }}>
+          {course.holes.map(h => (
+            <button key={h.hole} onClick={() => setExpanded(expanded === h.hole ? null : h.hole)}
+              style={{
+                padding: "6px 4px", border: `1px solid ${expanded === h.hole ? "var(--accent)" : "rgba(255,255,255,0.1)"}`,
+                borderRadius: 6, background: expanded === h.hole ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.03)",
+                cursor: "pointer", textAlign: "center" as const,
+              }}>
+              <div style={{ fontSize: 10, color: "var(--cream-dim)" }}>#{h.hole}</div>
+              <div style={{ fontSize: 13, color: h.par === 3 ? "var(--score-low)" : h.par === 5 ? "var(--accent)" : "var(--cream)", fontWeight: 600 }}>{h.par}</div>
+              <div style={{ fontSize: 9, color: "var(--cream-dim)" }}>{h.yards}</div>
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 11, color: "var(--cream-dim)" }}>
+          <span><span style={{ color: "var(--score-low)" }}>■</span> Par 3</span>
+          <span><span style={{ color: "var(--cream)" }}>■</span> Par 4</span>
+          <span><span style={{ color: "var(--accent)" }}>■</span> Par 5</span>
+          <span style={{ marginLeft: "auto", fontStyle: "italic" }}>Tap a hole to expand</span>
+        </div>
+      </div>
+
+      {/* Hole details */}
+      {course.holes.map(h => (
+        <div key={h.hole} style={{
+          background: "var(--card-bg)", border: `1px solid ${expanded === h.hole ? "var(--accent)" : "var(--card-border)"}`,
+          borderRadius: 10, marginBottom: 8, overflow: "hidden",
+          transition: "border-color 0.2s",
+        }}>
+          {/* Hole header row — always visible */}
+          <button onClick={() => setExpanded(expanded === h.hole ? null : h.hole)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" as const }}>
+            {/* Hole number badge */}
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: expanded === h.hole ? "var(--accent)" : "rgba(255,255,255,0.08)",
+              color: expanded === h.hole ? "var(--bg)" : "var(--cream-dim)",
+              fontSize: 14, fontWeight: 700,
+            }}>{h.hole}</div>
+
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: 15, color: "var(--cream)", fontFamily: "Playfair Display, serif" }}>{h.name}</span>
+                <span style={{ fontSize: 12, color: "var(--cream-dim)" }}>Hole {h.hole}</span>
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
+                <span style={{ fontSize: 12, color: h.par === 3 ? "var(--score-low)" : h.par === 5 ? "var(--accent)" : "var(--cream-dim)" }}>Par {h.par}</span>
+                <span style={{ fontSize: 12, color: "var(--cream-dim)" }}>{h.yards} yds</span>
+              </div>
+            </div>
+            <span style={{ fontSize: 12, color: "var(--cream-dim)" }}>{expanded === h.hole ? "▲" : "▼"}</span>
+          </button>
+
+          {/* Expanded detail */}
+          {expanded === h.hole && (
+            <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--card-border)" }}>
+              <p style={{ fontSize: 14, color: "var(--cream)", lineHeight: 1.7, marginTop: 12, marginBottom: 10 }}>{h.description}</p>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.15)", borderRadius: 6, padding: "8px 12px" }}>
+                <span style={{ fontSize: 14 }}>📌</span>
+                <span style={{ fontSize: 13, color: "var(--accent)", fontStyle: "italic" }}>{h.notes}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -967,12 +1274,13 @@ export default function Page() {
       <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 20 }}>{th.emoji}</span>
+            <span style={{ display: "inline-flex", alignItems: "center" }}>{tournament.id === "masters" ? <TexasIcon size={20} color={th.accent} /> : <span style={{ fontSize: 20 }}>{th.emoji}</span>}</span>
             <h1 style={{ fontSize: 20, color: th.accent, fontFamily: "Playfair Display, serif", lineHeight: 1 }}>Major Pick&apos;em</h1>
           </div>
           <div style={{ fontSize: 11, color: th.creamDim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>{tournament.shortName} · {tournament.location}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <PlayerAvatar username={username} size={28} />
           <span style={{ fontSize: 14, color: th.creamDim, fontStyle: "italic" }}>{username}</span>
           <button onClick={handleLogout} style={{ background: "transparent", border: `1px solid ${th.cardBorder}`, color: th.creamDim, padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
             Sign out
@@ -986,7 +1294,7 @@ export default function Page() {
 
       {/* Tab nav */}
       <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "0 24px", display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
-        {(["picks", "leaderboard", "history"] as Tab[]).map((t) => (
+        {(["picks", "leaderboard", "history", "course"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "13px 22px", fontSize: 15, background: "transparent", border: "none",
             borderBottom: tab === t ? `2px solid ${th.accent}` : "2px solid transparent",
@@ -994,7 +1302,7 @@ export default function Page() {
             cursor: "pointer", fontFamily: "Playfair Display, serif",
             fontWeight: tab === t ? 600 : 400, transition: "all 0.2s",
           }}>
-            {t === "picks" ? "My Picks" : t === "leaderboard" ? "Leaderboard" : "History"}
+            {t === "picks" ? "My Picks" : t === "leaderboard" ? "Leaderboard" : t === "history" ? "History" : "Course Guide"}
           </button>
         ))}
       </div>
@@ -1009,6 +1317,9 @@ export default function Page() {
         )}
         {tab === "history" && (
           <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />
+        )}
+        {tab === "course" && (
+          <CourseTab tournament={tournament} />
         )}
       </main>
     </div>
