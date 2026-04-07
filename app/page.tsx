@@ -318,72 +318,121 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
 
 // ─── Course Hero ──────────────────────────────────────────────────────────────
 function CourseHero({ tournament }: { tournament: Tournament }) {
-  const [photos, setPhotos] = useState<{ url: string; caption: string }[]>(tournament.theme.photos);
+  const [photos, setPhotos] = useState<{ url: string; caption: string }[]>([]);
   const [idx, setIdx] = useState(0);
-  const [fading, setFading] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
-  // Fetch real course photos from Wikipedia API
+  // Fetch photos on mount
   useEffect(() => {
+    setPhotos([]);
+    setIdx(0);
+    setLoaded(false);
     fetch(`/api/course-photos?tournament=${tournament.id}`)
       .then(r => r.json())
-      .then(d => { if (d.photos?.length > 0) setPhotos(d.photos); })
+      .then(d => {
+        if (Array.isArray(d.photos) && d.photos.length > 0) {
+          setPhotos(d.photos);
+        }
+      })
       .catch(() => null);
   }, [tournament.id]);
 
+  // Auto-rotate
   useEffect(() => {
     if (photos.length <= 1) return;
-    const interval = setInterval(() => {
-      setFading(true);
+    const timer = setInterval(() => {
+      setVisible(false);
       setTimeout(() => {
-        setIdx((i) => (i + 1) % photos.length);
-        setFading(false);
-      }, 600);
-    }, 6000);
-    return () => clearInterval(interval);
+        setIdx(prev => (prev + 1) % photos.length);
+        setLoaded(false);
+        setVisible(true);
+      }, 500);
+    }, 7000);
+    return () => clearInterval(timer);
   }, [photos.length]);
 
-  const photo = photos[idx];
+  const photo = photos[idx] ?? null;
 
   return (
-    <div style={{ position: "relative", width: "100%", height: 280, overflow: "hidden" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photo.url}
-        alt={photo.caption}
-        style={{
-          width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center",
-          transition: "opacity 0.6s ease", opacity: fading ? 0 : 1,
-          display: "block",
-        }}
-        onError={(e) => {
-          // Try next photo on error rather than blank
-          (e.target as HTMLImageElement).style.display = "none";
-          setIdx((i) => (i + 1) % photos.length);
-        }}
-      />
-      {/* Dark gradient overlay — bottom to top for text legibility */}
+    <div style={{
+      position: "relative", width: "100%", height: 280,
+      overflow: "hidden",
+      background: "linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-mid) 100%)",
+    }}>
+      {/* Background gradient — always visible, looks intentional even without photo */}
       <div style={{
         position: "absolute", inset: 0,
-        background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.15) 100%)",
+        background: `linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-dark) 40%, var(--bg-mid) 100%)`,
+        opacity: loaded ? 0 : 1,
+        transition: "opacity 0.7s ease",
       }} />
-      {/* Caption */}
+
+      {/* Photo — fades in once loaded */}
+      {photo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={`${tournament.id}-${idx}`}
+          src={photo.url}
+          alt={photo.caption}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            // Skip bad image, try next
+            setPhotos(prev => prev.filter((_, i) => i !== idx));
+            setIdx(0);
+          }}
+          style={{
+            position: "absolute", inset: 0,
+            width: "100%", height: "100%",
+            objectFit: "cover",
+            objectPosition: "center 40%",
+            transition: "opacity 0.7s ease",
+            opacity: loaded && visible ? 1 : 0,
+          }}
+        />
+      )}
+
+      {/* Gradient overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.3) 45%, rgba(0,0,0,0.08) 100%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* Tournament title overlay */}
+      <div style={{
+        position: "absolute", top: 20, left: 20,
+        display: "flex", alignItems: "center", gap: 10,
+      }}>
+        <span style={{ fontSize: 28 }}>{tournament.theme.emoji}</span>
+        <div>
+          <div style={{ fontSize: 15, color: "var(--accent)", fontFamily: "Playfair Display, serif", fontWeight: 600, lineHeight: 1.2 }}>
+            {tournament.shortName} {tournament.year}
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em" }}>
+            {tournament.location.split("·")[0].trim()}
+          </div>
+        </div>
+      </div>
+
+      {/* Caption + dots */}
       <div style={{
         position: "absolute", bottom: 12, left: 16, right: 16,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", fontStyle: "italic" }}>
-          {photo.caption}
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em", fontStyle: "italic" }}>
+          {photo?.caption ?? ""}
         </span>
-        {/* Dot indicators for Augusta rotation */}
         {photos.length > 1 && (
           <div style={{ display: "flex", gap: 5 }}>
             {photos.map((_, i) => (
               <button
                 key={i}
-                onClick={() => setIdx(i)}
+                onClick={() => { setVisible(false); setTimeout(() => { setIdx(i); setLoaded(false); setVisible(true); }, 300); }}
                 style={{
-                  width: 6, height: 6, borderRadius: "50%", border: "none", padding: 0, cursor: "pointer",
-                  background: i === idx ? "var(--accent)" : "rgba(255,255,255,0.4)",
+                  width: 6, height: 6, borderRadius: "50%", border: "none",
+                  padding: 0, cursor: "pointer",
+                  background: i === idx ? "var(--accent)" : "rgba(255,255,255,0.35)",
                   transition: "background 0.3s",
                 }}
               />

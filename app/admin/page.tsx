@@ -74,6 +74,41 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   );
 }
 
+function PhotoDebug() {
+  const [photos, setPhotos] = useState<{url: string; caption: string}[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function fetchPhotos() {
+    setLoading(true); setPhotos([]); setMsg("");
+    try {
+      const res = await fetch("/api/course-photos?tournament=masters&bust=1");
+      const data = await res.json();
+      setPhotos(data.photos ?? []);
+      setMsg(`Source: ${data.source} · ${data.count ?? data.photos?.length ?? 0} photos returned`);
+    } catch { setMsg("Error fetching photos"); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div>
+      <button onClick={fetchPhotos} disabled={loading} style={{ padding: "8px 16px", background: "#1a1a2a", border: "1px solid #2a3a5a", color: "#8facd4", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "monospace" }}>
+        {loading ? "Loading..." : "🔍 Fetch Masters Photos"}
+      </button>
+      {msg && <div style={{ fontSize: 12, color: "#888", marginTop: 8 }}>{msg}</div>}
+      {photos.map((p, i) => (
+        <div key={i} style={{ marginTop: 12, border: "1px solid #333", borderRadius: 6, overflow: "hidden" }}>
+          <div style={{ fontSize: 11, color: "#666", padding: "6px 10px", background: "#111", wordBreak: "break-all" as const }}>{p.url}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={p.url} alt={p.caption} style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <div style={{ fontSize: 12, color: "#aaa", padding: "6px 10px" }}>{p.caption}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -442,6 +477,15 @@ export default function AdminPage() {
           <div style={{ marginTop: 10, fontSize: 12, color: "#555", fontStyle: "italic" }}>
             Note: ESPN stats are only available during/after active tour events. Stats may return empty during off-weeks even for top players.
           </div>
+        </div>
+
+        {/* ── Photo Debug ── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>📸 Course Photo Debug</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+            Check what photo URLs are being returned and preview them.
+          </div>
+          <PhotoDebug />
         </div>
 
         {/* ── Odds Debug ── */}
