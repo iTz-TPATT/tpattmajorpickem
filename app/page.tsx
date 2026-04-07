@@ -71,14 +71,14 @@ function scoreColor(n: number | null): string {
 }
 
 // ─── Player Stats Tooltip ─────────────────────────────────────────────────────
-function StatsTooltip({ espnId, visible }: { espnId: string; visible: boolean }) {
+function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerName: string; visible: boolean }) {
   const [stats, setStats] = useState<Record<string, string> | null>(null);
   const fetched = useRef(false);
 
   useEffect(() => {
     if (!visible || fetched.current || !espnId) return;
     fetched.current = true;
-    fetch(`/api/stats?espnId=${espnId}`)
+    fetch(`/api/stats?espnId=${encodeURIComponent(espnId)}&name=${encodeURIComponent(playerName)}`)
       .then((r) => r.json())
       .then((d) => setStats(d.stats))
       .catch(() => null);
@@ -171,7 +171,7 @@ function GolferCard({
 
       {/* Hover stats tooltip */}
       {hover && espnId && !burned && !cut && (
-        <StatsTooltip espnId={espnId} visible={hover} />
+        <StatsTooltip espnId={espnId} playerName={name} visible={hover} />
       )}
     </div>
   );

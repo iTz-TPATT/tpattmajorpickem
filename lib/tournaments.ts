@@ -46,11 +46,24 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
       cardBg: "rgba(255,255,255,0.04)", cardBorder: "rgba(201,168,76,0.18)",
       scoreLow: "#5dba7e", scoreHigh: "#e07b6f", emoji: "🌿",
       gradient: "linear-gradient(135deg,#071510 0%,#0f2318 50%,#071510 100%)",
+      // Wikimedia Commons — verified Augusta National photos
       photos: [
-        { url: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=1400&q=80&fit=crop", caption: "Amen Corner — Augusta National" },
-        { url: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=1400&q=80&fit=crop", caption: "Augusta National Golf Club" },
-        { url: "https://images.unsplash.com/photo-1622396481328-9b1b78cdd9fd?w=1400&q=80&fit=crop", caption: "The Azaleas — Augusta National" },
-        { url: "https://images.unsplash.com/photo-1560439514-4e9645039924?w=1400&q=80&fit=crop", caption: "Augusta National — Georgia" },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Augusta_National_Golf_Club_12th_hole.jpg",
+          caption: "12th Hole — Golden Bell · Augusta National",
+        },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Augusta_National_Golf_Club_13th_hole.jpg",
+          caption: "13th Hole — Azalea · Augusta National",
+        },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Augusta_National_Golf_Club_16th_hole.jpg",
+          caption: "16th Hole — Redbud · Augusta National",
+        },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Augusta_National_Golf_Club.jpg",
+          caption: "Augusta National Golf Club · Augusta, Georgia",
+        },
       ],
     },
     oddsKey: "golf_masters_tournament_winner",
@@ -73,7 +86,10 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
       scoreLow: "#5dba9e", scoreHigh: "#e07b6f", emoji: "🏆",
       gradient: "linear-gradient(135deg,#060d1f 0%,#0d1a35 50%,#060d1f 100%)",
       photos: [
-        { url: "https://images.unsplash.com/photo-1591491719565-9394b3db2b47?w=1400&q=80&fit=crop", caption: "The Green Mile — Quail Hollow Club, Charlotte" },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Quail_Hollow_Club_18th_hole.jpg",
+          caption: "18th Hole — The Green Mile · Quail Hollow Club",
+        },
       ],
     },
     oddsKey: "golf_pga_championship_winner",
@@ -96,7 +112,10 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
       scoreLow: "#5dba7e", scoreHigh: "#e07b6f", emoji: "🇺🇸",
       gradient: "linear-gradient(135deg,#0a0d18 0%,#0f1428 50%,#0a0d18 100%)",
       photos: [
-        { url: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=1400&q=80&fit=crop", caption: "Church Pew Bunkers — Oakmont Country Club" },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Oakmont_Country_Club_church_pew_bunkers.jpg",
+          caption: "Church Pew Bunkers · Oakmont Country Club",
+        },
       ],
     },
     oddsKey: "golf_us_open_winner",
@@ -119,7 +138,10 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
       scoreLow: "#5dba7e", scoreHigh: "#e07b6f", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
       gradient: "linear-gradient(135deg,#0c0c0c 0%,#181818 50%,#0c0c0c 100%)",
       photos: [
-        { url: "https://images.unsplash.com/photo-1592919505780-303950717480?w=1400&q=80&fit=crop", caption: "Dunluce Links — Royal Portrush, Northern Ireland" },
+        {
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Royal_Portrush_Golf_Club_-_Dunluce_Links.jpg",
+          caption: "Dunluce Links · Royal Portrush Golf Club",
+        },
       ],
     },
     oddsKey: "golf_the_open_championship_winner",
