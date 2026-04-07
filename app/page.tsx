@@ -13,6 +13,12 @@ interface GolferScore {
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
 }
+interface Overrides {
+  roundOverride?: number;
+  revealAll?: boolean;
+  skipDeadline?: boolean;
+  useManualScores?: boolean;
+}
 type Tab = "picks" | "leaderboard" | "history" | "course";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -1397,6 +1403,21 @@ export default function Page() {
     if (!token) return;
     const interval = setInterval(() => fetchData(token), 2 * 60 * 1000);
     return () => clearInterval(interval);
+  }, [token, fetchData]);
+    // === immediate refresh when admin updates scores/overrides/proxy picks ===
+  useEffect(() => {
+    if (!token) return;
+
+    // Handler for storage events fired from other tabs/windows (when admin writes the refresh key)
+    function onStorage(e: StorageEvent) {
+      if (e.key === "mp_data_refresh") {
+        // Optionally check e.newValue or parse timestamp; always refetch
+        fetchData(token).catch(() => { /* swallow */ });
+      }
+    }
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [token, fetchData]);
 
   function handleLogin(t: string, u: string) {
