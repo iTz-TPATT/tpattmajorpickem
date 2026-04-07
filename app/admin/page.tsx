@@ -126,6 +126,7 @@ export default function AdminPage() {
   const [proxyMsg, setProxyMsg] = useState("");
   const [oddsDebug, setOddsDebug] = useState<string>("");
   const [statsDebug, setStatsDebug] = useState<string>("");
+  const [photoDebug, setPhotoDebug] = useState<string>("");
   const [proxyMsgType, setProxyMsgType] = useState<"ok"|"err">("ok");
 
   const showMsg = (m: string, t: "ok" | "err" = "ok") => {
@@ -444,6 +445,36 @@ export default function AdminPage() {
             style={{ ...S.btn("green"), padding: "10px 24px", fontSize: 14, opacity: (saving || proxyPicks.length !== 3 || !proxyUser) ? 0.5 : 1 }}>
             {saving ? "Submitting…" : "Submit Picks on Their Behalf"}
           </button>
+        </div>
+
+        {/* ── Photos Debug ── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>🖼 Course Photos Debug</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
+            Test what photos the Wikipedia API is returning for Augusta National.
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
+            <button onClick={async () => {
+              setPhotoDebug("Fetching...");
+              try {
+                const res = await fetch("/api/course-photos?tournament=masters&bust=1");
+                const data = await res.json();
+                if (!data.photos || data.photos.length === 0) {
+                  setPhotoDebug("❌ No photos returned. Source: " + (data.source ?? "unknown"));
+                } else {
+                  const preview = data.photos.map((p: {url: string; caption: string}, i: number) =>
+                    `Photo ${i+1}: ${p.caption} | URL: ${p.url.slice(0, 80)}...`
+                  ).join("\n");
+                  setPhotoDebug(`✓ ${data.photos.length} photos found (${data.source}):\n${preview}`);
+                }
+              } catch { setPhotoDebug("❌ Network error"); }
+            }} style={S.btn("blue")}>🔍 Test Masters Photos</button>
+          </div>
+          {photoDebug && (
+            <pre style={{ marginTop: 12, padding: "10px 14px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 6, fontSize: 11, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-wrap" as const, wordBreak: "break-all" as const }}>
+              {photoDebug}
+            </pre>
+          )}
         </div>
 
         {/* ── Stats Debug ── */}
