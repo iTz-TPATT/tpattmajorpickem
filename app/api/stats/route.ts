@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 
-// Known ESPN IDs as a fast-path cache for top players
 const KNOWN_ESPN_IDS: Record<string, string> = {
   "Scottie Scheffler": "4686091",
   "Rory McIlroy": "3470",
@@ -36,42 +35,15 @@ const KNOWN_ESPN_IDS: Record<string, string> = {
 };
 
 const ESPN_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept": "application/json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
   "Origin": "https://www.espn.com",
-  "Referer": "https://www.espn.com/",
+  "Referer": "https://www.espn.com/golf/",
+  "sec-fetch-dest": "empty",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-site": "same-site",
 };
-
-// Search ESPN for a player by name and return their athlete ID
-async function lookupEspnId(playerName: string): Promise<string | null> {
-  try {
-    const encoded = encodeURIComponent(playerName);
-    const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/athletes?search=${encoded}&limit=5`;
-    const res = await fetch(url, { headers: ESPN_HEADERS, cache: "no-store" });
-    if (!res.ok) return null;
-
-    const data = await res.json() as Record<string, unknown>;
-    const items = (data.items as unknown[]) ?? (data.athletes as unknown[]) ?? [];
-
-    for (const item of items) {
-      const a = item as Record<string, unknown>;
-      const name = (a.displayName ?? a.fullName ?? a.name ?? "") as string;
-      // Case-insensitive name match
-      if (name.toLowerCase() === playerName.toLowerCase()) {
-        return String(a.id ?? "");
-      }
-    }
-
-    // If no exact match, return first result
-    if (items.length > 0) {
-      const first = items[0] as Record<string, unknown>;
-      return String(first.id ?? "");
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
 
 interface StatResult {
   "Scoring Avg"?: string;
@@ -80,54 +52,139 @@ interface StatResult {
   "GIR %"?: string;
   "Putts/Round"?: string;
   "World Rank"?: string;
+  "Wins"?: string;
 }
 
-async function fetchESPNStats(espnId: string): Promise<StatResult | null> {
+const STAT_NAME_MAP: Record<string, keyof StatResult> = {
+  scoringAverage: "Scoring Avg",
+  scoring_average: "Scoring Avg",
+  scoringavg: "Scoring Avg",
+  "Scoring Average": "Scoring Avg",
+  drivingDistance: "Driving Distance",
+  driving_distance: "Driving Distance",
+  "Driving Distance": "Driving Distance",
+  drivingAccuracy: "Fairways Hit",
+  driving_accuracy: "Fairways Hit",
+  "Driving Accuracy": "Fairways Hit",
+  greensInRegulation: "GIR %",
+  greens_in_regulation: "GIR %",
+  "Greens in Regulation": "GIR %",
+  puttingAverage: "Putts/Round",
+  putting_average: "Putts/Round",
+  "Putting Average": "Putts/Round",
+  worldRanking: "World Rank",
+  world_ranking: "World Rank",
+  "World Ranking": "World Rank",
+  wins: "Wins",
+  "Wins": "Wins",
+};
+
+function parseStatsFromData(data: Record<string, unknown>): StatResult {
+  const result: StatResult = {};
+
+  // Path 1: splits.categories[].stats[]
+  const splits = data.splits as Record<string, unknown> | undefined;
+  const cats1 = (splits?.categories as unknown[]) ?? [];
+
+  // Path 2: top-level categories[]
+  const cats2 = (data.categories as unknown[]) ?? [];
+
+  // Path 3: statistics[]
+  const cats3 = (data.statistics as unknown[]) ?? [];
+
+  // Path 4: athlete.statistics
+  const athleteStats = ((data.athlete as Record<string, unknown>)?.statistics as unknown[]) ?? [];
+
+  const allCats = [...cats1, ...cats2, ...cats3, ...athleteStats];
+
+  for (const cat of allCats) {
+    const c = cat as Record<string, unknown>;
+    const statsArr = (c.stats ?? c.leaders ?? c.values ?? c.statistics ?? []) as unknown[];
+    for (const s of statsArr) {
+      const stat = s as Record<string, unknown>;
+      const nameKey = (stat.name ?? stat.abbreviation ?? stat.displayName ?? stat.label ?? "") as string;
+      const label = STAT_NAME_MAP[nameKey];
+      if (label && stat.displayValue && !result[label]) {
+        result[label] = stat.displayValue as string;
+      }
+      // Also check value directly
+      if (label && stat.value !== undefined && !result[label]) {
+        result[label] = String(stat.value);
+      }
+    }
+  }
+
+  // World rank from top-level athlete object
+  const athlete = data.athlete as Record<string, unknown> | undefined;
+  if (athlete?.rank && !result["World Rank"]) {
+    result["World Rank"] = `#${athlete.rank}`;
+  }
+  if (athlete?.displayRank && !result["World Rank"]) {
+    result["World Rank"] = String(athlete.displayRank);
+  }
+
+  return result;
+}
+
+async function tryFetch(url: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(url, {
+      headers: ESPN_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchStats(espnId: string): Promise<StatResult | null> {
+  // Try every known ESPN stats URL format
   const urls = [
+    // Current ESPN athlete stats endpoint
     `https://site.api.espn.com/apis/site/v2/sports/golf/pga/athletes/${espnId}/statistics`,
-    `https://site.api.espn.com/apis/common/v3/sports/golf/pga/athletes/${espnId}/statisticslog`,
+    // Common v3 endpoint
+    `https://site.api.espn.com/apis/common/v3/sports/golf/pga/athletes/${espnId}/statistics`,
+    // Stats log (season breakdown)
+    `https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons/2025/athletes/${espnId}/statistics/0`,
+    // Current season
+    `https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons/2026/athletes/${espnId}/statistics/0`,
+    // Athlete overview (often includes stats)
+    `https://site.api.espn.com/apis/site/v2/sports/golf/pga/athletes/${espnId}`,
   ];
 
   for (const url of urls) {
-    try {
-      const res = await fetch(url, { headers: ESPN_HEADERS, cache: "no-store" });
-      if (!res.ok) continue;
-      const data = await res.json() as Record<string, unknown>;
-      const result: StatResult = {};
+    const data = await tryFetch(url);
+    if (!data) continue;
 
-      const splits = data.splits as Record<string, unknown> | undefined;
-      const categories = (splits?.categories as unknown[]) ?? (data.categories as unknown[]) ?? [];
+    const result = parseStatsFromData(data);
+    if (Object.keys(result).length > 0) return result;
+  }
 
-      const statNameMap: Record<string, keyof StatResult> = {
-        scoringAverage: "Scoring Avg",
-        scoring_average: "Scoring Avg",
-        drivingDistance: "Driving Distance",
-        driving_distance: "Driving Distance",
-        drivingAccuracy: "Fairways Hit",
-        driving_accuracy: "Fairways Hit",
-        greensInRegulation: "GIR %",
-        greens_in_regulation: "GIR %",
-        puttingAverage: "Putts/Round",
-        putting_average: "Putts/Round",
-        worldRanking: "World Rank",
-        world_ranking: "World Rank",
-      };
+  return null;
+}
 
-      for (const cat of categories) {
-        const c = cat as Record<string, unknown>;
-        for (const s of (c.stats as unknown[]) ?? []) {
-          const stat = s as Record<string, unknown>;
-          const name = (stat.name ?? stat.abbreviation ?? "") as string;
-          const label = statNameMap[name];
-          if (label && stat.displayValue) result[label] = stat.displayValue as string;
-        }
+async function lookupEspnId(playerName: string): Promise<string | null> {
+  const urls = [
+    `https://site.api.espn.com/apis/site/v2/sports/golf/pga/athletes?search=${encodeURIComponent(playerName)}&limit=5`,
+    `https://site.api.espn.com/apis/search/v2?query=${encodeURIComponent(playerName)}&sport=golf&limit=5`,
+  ];
+
+  for (const url of urls) {
+    const data = await tryFetch(url);
+    if (!data) continue;
+
+    const items = (data.items ?? data.athletes ?? data.results ?? []) as unknown[];
+    for (const item of items) {
+      const a = item as Record<string, unknown>;
+      const name = (a.displayName ?? a.fullName ?? a.name ?? a.title ?? "") as string;
+      if (name.toLowerCase().includes(playerName.toLowerCase().split(" ")[1] ?? playerName.toLowerCase())) {
+        const id = String(a.id ?? a.uid ?? "").replace(/[^0-9]/g, "");
+        if (id) return id;
       }
-
-      const athlete = data.athlete as Record<string, unknown> | undefined;
-      if (athlete?.rank) result["World Rank"] = `#${athlete.rank}`;
-
-      if (Object.keys(result).length > 0) return result;
-    } catch { continue; }
+    }
   }
   return null;
 }
@@ -136,14 +193,16 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   let espnId = searchParams.get("espnId") ?? "";
   const playerName = searchParams.get("name") ?? "";
+  const debug = searchParams.get("debug") === "1";
 
-  // 1. Try the known fast-path ID map first
+  // 1. Fast path: known IDs
   if ((!espnId || espnId === "undefined" || espnId === "0") && playerName) {
     espnId = KNOWN_ESPN_IDS[playerName] ?? "";
   }
 
-  // 2. If still no ID, check Supabase cache for previously looked-up IDs
   const supabase = createServerSupabase();
+
+  // 2. Check Supabase cache for previously resolved IDs
   if (!espnId && playerName) {
     const cacheKey = `espnid_${playerName.toLowerCase().replace(/\s+/g, "_")}`;
     const { data: cached } = await supabase
@@ -151,18 +210,14 @@ export async function GET(request: Request) {
       .select("data")
       .eq("tournament", cacheKey)
       .single();
-
-    if (cached?.data) {
-      espnId = (cached.data as Record<string, string>).espnId ?? "";
-    }
+    if (cached?.data) espnId = (cached.data as Record<string, string>).espnId ?? "";
   }
 
-  // 3. If still no ID, do a live ESPN search by name and cache the result
+  // 3. Dynamic lookup
   if (!espnId && playerName) {
     const found = await lookupEspnId(playerName);
     if (found) {
       espnId = found;
-      // Cache it so we don't search again
       const cacheKey = `espnid_${playerName.toLowerCase().replace(/\s+/g, "_")}`;
       await supabase.from("score_cache").upsert({
         tournament: cacheKey,
@@ -173,14 +228,21 @@ export async function GET(request: Request) {
   }
 
   if (!espnId) {
-    return NextResponse.json({ stats: null, reason: "player_not_found" });
+    return NextResponse.json({ stats: null, reason: "no_id", playerName, debug: debug ? "no ESPN ID found" : undefined });
   }
 
-  // 4. Fetch and return stats
-  try {
-    const stats = await fetchESPNStats(espnId);
-    return NextResponse.json({ stats });
-  } catch {
-    return NextResponse.json({ stats: null, reason: "fetch_error" });
+  // 4. Fetch stats — with debug info
+  const stats = await fetchStats(espnId);
+
+  if (debug) {
+    return NextResponse.json({
+      stats,
+      espnId,
+      playerName,
+      hasStats: stats !== null && Object.keys(stats ?? {}).length > 0,
+      statKeys: stats ? Object.keys(stats) : [],
+    });
   }
+
+  return NextResponse.json({ stats: stats ?? {} });
 }

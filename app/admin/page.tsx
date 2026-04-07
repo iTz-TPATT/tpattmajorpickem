@@ -90,6 +90,7 @@ export default function AdminPage() {
   const [proxyPicks, setProxyPicks] = useState<string[]>([]);
   const [proxyMsg, setProxyMsg] = useState("");
   const [oddsDebug, setOddsDebug] = useState<string>("");
+  const [statsDebug, setStatsDebug] = useState<string>("");
   const [proxyMsgType, setProxyMsgType] = useState<"ok"|"err">("ok");
 
   const showMsg = (m: string, t: "ok" | "err" = "ok") => {
@@ -408,6 +409,39 @@ export default function AdminPage() {
             style={{ ...S.btn("green"), padding: "10px 24px", fontSize: 14, opacity: (saving || proxyPicks.length !== 3 || !proxyUser) ? 0.5 : 1 }}>
             {saving ? "Submitting…" : "Submit Picks on Their Behalf"}
           </button>
+        </div>
+
+        {/* ── Stats Debug ── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>📊 Player Stats Debug</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
+            Test whether the ESPN stats API is working for a specific player.
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" as const }}>
+            {["Scottie Scheffler", "Rory McIlroy", "Jon Rahm"].map(name => (
+              <button key={name} onClick={async () => {
+                setStatsDebug(`Fetching stats for ${name}...`);
+                try {
+                  const res = await fetch(`/api/stats?name=${encodeURIComponent(name)}&debug=1`);
+                  const data = await res.json();
+                  if (!data.hasStats) {
+                    setStatsDebug(`❌ No stats for ${name}. ESPN ID used: ${data.espnId ?? "none"}. Reason: ${data.reason ?? "ESPN returned empty"}. URLs tried may all be returning empty during off-week.`);
+                  } else {
+                    const entries = Object.entries(data.stats as Record<string,string>).map(([k,v]) => `${k}: ${v}`).join(" · ");
+                    setStatsDebug(`✓ ${name} (ID: ${data.espnId}): ${entries}`);
+                  }
+                } catch { setStatsDebug("❌ Network error"); }
+              }} style={S.btn("blue")}>{name}</button>
+            ))}
+          </div>
+          {statsDebug && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 6, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+              {statsDebug}
+            </div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 12, color: "#555", fontStyle: "italic" }}>
+            Note: ESPN stats are only available during/after active tour events. Stats may return empty during off-weeks even for top players.
+          </div>
         </div>
 
         {/* ── Odds Debug ── */}

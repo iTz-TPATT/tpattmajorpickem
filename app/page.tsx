@@ -16,6 +16,10 @@ interface GolferScore {
 type Tab = "picks" | "leaderboard" | "history";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
+function normalizeName(name: string): string {
+  return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
 function fmtScore(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   if (n === 0) return "E";
@@ -73,16 +77,23 @@ function scoreColor(n: number | null): string {
 // ─── Player Stats Tooltip ─────────────────────────────────────────────────────
 function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerName: string; visible: boolean }) {
   const [stats, setStats] = useState<Record<string, string> | null>(null);
+  const [failed, setFailed] = useState(false);
   const fetched = useRef(false);
 
   useEffect(() => {
-    if (!visible || fetched.current || !espnId) return;
+    // Require at least a player name — espnId may be empty outside tournament week
+    if (!visible || fetched.current || !playerName) return;
     fetched.current = true;
-    fetch(`/api/stats?espnId=${encodeURIComponent(espnId)}&name=${encodeURIComponent(playerName)}`)
+    const params = new URLSearchParams({ name: playerName });
+    if (espnId) params.set("espnId", espnId);
+    fetch(`/api/stats?${params.toString()}`)
       .then((r) => r.json())
-      .then((d) => setStats(d.stats))
-      .catch(() => null);
-  }, [visible, espnId]);
+      .then((d) => {
+        // d.stats is null when player not found — still update state so we stop showing "Loading"
+        setStats(d.stats ?? {});
+      })
+      .catch(() => { setFailed(true); setStats({}); });
+  }, [visible, espnId, playerName]);
 
   if (!visible) return null;
 
@@ -95,7 +106,7 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
     }}>
       {!stats ? (
         <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Loading stats…</div>
-      ) : Object.keys(stats).length === 0 ? (
+      ) : failed || Object.keys(stats).length === 0 ? (
         <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Stats unavailable</div>
       ) : (
         Object.entries(stats).map(([k, v]) => (
@@ -307,9 +318,17 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
 
 // ─── Course Hero ──────────────────────────────────────────────────────────────
 function CourseHero({ tournament }: { tournament: Tournament }) {
-  const photos = tournament.theme.photos;
+  const [photos, setPhotos] = useState<{ url: string; caption: string }[]>(tournament.theme.photos);
   const [idx, setIdx] = useState(0);
   const [fading, setFading] = useState(false);
+
+  // Fetch real course photos from Wikipedia API
+  useEffect(() => {
+    fetch(`/api/course-photos?tournament=${tournament.id}`)
+      .then(r => r.json())
+      .then(d => { if (d.photos?.length > 0) setPhotos(d.photos); })
+      .catch(() => null);
+  }, [tournament.id]);
 
   useEffect(() => {
     if (photos.length <= 1) return;
@@ -542,7 +561,7 @@ function MyPicksTab({
                   burned={burnedSet.has(gs.name)}
                   cut={round >= 3 && gs.status !== "active"}
                   disabled={!selected.includes(gs.name) && selected.length >= 3}
-                  odds={odds[gs.name] ?? ""}
+                  odds={odds[gs.name] ?? odds[normalizeName(gs.name)] ?? ""}
                   espnId={gs.espnId}
                   headshot={gs.headshot}
                   onClick={() => toggle(gs.name)}

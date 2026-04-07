@@ -28,6 +28,28 @@ const ODDS_SPORT_KEYS: Record<string, string[]> = {
   ],
 };
 
+
+// Normalize player names for fuzzy matching
+// Handles "Rory McIlroy" vs "Rory Mcilroy", accents, etc.
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip accents (Åberg -> Aberg)
+    .replace(/[^a-z\s]/g, "")          // remove non-alpha
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Build a normalized odds map so player name differences don't break lookup
+function buildNormalizedOddsMap(raw: Record<string, string>): Record<string, string> {
+  const normalized: Record<string, string> = {};
+  for (const [name, odds] of Object.entries(raw)) {
+    normalized[normalizeName(name)] = odds;
+  }
+  return normalized;
+}
+
 async function fetchOddsFromAPI(apiKey: string, tournamentId: string): Promise<Record<string, string>> {
   const sportKeys = ODDS_SPORT_KEYS[tournamentId] ?? [TOURNAMENTS[tournamentId as TournamentId]?.oddsKey];
 
@@ -78,6 +100,11 @@ async function fetchOddsFromAPI(apiKey: string, tournamentId: string): Promise<R
 
       if (Object.keys(oddsMap).length > 0) {
         console.log(`Odds loaded from ${sportKey}: ${Object.keys(oddsMap).length} players`);
+        // Also add normalized name entries so lookups work regardless of casing/accents
+        for (const [name, odds] of Object.entries(oddsMap)) {
+          const norm = normalizeName(name);
+          if (!oddsMap[norm]) oddsMap[norm] = odds;
+        }
         return oddsMap;
       }
     } catch (err) {
