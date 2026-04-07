@@ -89,6 +89,7 @@ export default function AdminPage() {
   const [proxyRound, setProxyRound] = useState(1);
   const [proxyPicks, setProxyPicks] = useState<string[]>([]);
   const [proxyMsg, setProxyMsg] = useState("");
+  const [oddsDebug, setOddsDebug] = useState<string>("");
   const [proxyMsgType, setProxyMsgType] = useState<"ok"|"err">("ok");
 
   const showMsg = (m: string, t: "ok" | "err" = "ok") => {
@@ -407,6 +408,42 @@ export default function AdminPage() {
             style={{ ...S.btn("green"), padding: "10px 24px", fontSize: 14, opacity: (saving || proxyPicks.length !== 3 || !proxyUser) ? 0.5 : 1 }}>
             {saving ? "Submitting…" : "Submit Picks on Their Behalf"}
           </button>
+        </div>
+
+        {/* ── Odds Debug ── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>📈 Odds API Debug</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
+            Check if the The Odds API key is working and returning player odds.
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" as const }}>
+            <button onClick={async () => {
+              setOddsDebug("Fetching...");
+              try {
+                const res = await fetch("/api/odds?tournament=masters&debug=1", { headers: { "x-admin-password": password } });
+                const data = await res.json();
+                const source = data.source ?? "unknown";
+                const count = Object.keys(data.odds ?? {}).length;
+                if (count === 0) {
+                  setOddsDebug(`❌ No odds returned. Source: ${source}. Check that ODDS_API_KEY is set in Vercel and the Masters event is live on the-odds-api.com.`);
+                } else {
+                  const sample = Object.entries(data.odds as Record<string,string>).slice(0, 5).map(([k,v]) => `${k}: ${v}`).join(" · ");
+                  setOddsDebug(`✓ ${count} players loaded (${source}). Sample: ${sample}`);
+                }
+              } catch { setOddsDebug("❌ Network error fetching odds"); }
+            }} style={S.btn("blue")}>🔍 Test Odds API</button>
+            <button onClick={async () => {
+              try {
+                await fetch("/api/odds?tournament=masters&debug=1");
+                setOddsDebug("Cache cleared — next page load will re-fetch from The Odds API");
+              } catch { setOddsDebug("Error"); }
+            }} style={S.btn("yellow")}>↺ Clear Odds Cache</button>
+          </div>
+          {oddsDebug && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 6, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+              {oddsDebug}
+            </div>
+          )}
         </div>
 
         {/* ── Test Walkthrough ── */}
