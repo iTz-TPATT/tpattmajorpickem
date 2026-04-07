@@ -5,9 +5,10 @@ import { NextResponse } from "next/server";
 
 const PHOTOS: Record<string, { file: string; caption: string }[]> = {
   masters: [
-    { file: "masters-logo.jpg",        caption: "The Azaleas · Augusta National Golf Club" },
-    { file: "masters-pond.jpg",        caption: "Amen Corner · Augusta National" },
-    { file: "masters-leaderboard.jpg", caption: "Augusta National Golf Club · Augusta, Georgia" },
+    { file: "masters-logo.jpg",              caption: "The Azaleas · Augusta National Golf Club" },
+    { file: "masters-pond.jpg",              caption: "Amen Corner · Augusta National" },
+    { file: "masters-leaderboard.jpg",       caption: "Augusta National Golf Club · Augusta, Georgia" },
+    { file: "masters-tee-shot-crowd (6).jpg", caption: "Masters Week · Augusta National" },
   ],
   // ── Future majors — upload photos and uncomment ──────────────────────────
   // pga: [
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
   }
 
   const photos = entries.map((entry, i) => ({
-    url: `/images/${entry.file}`,
+    url: `/courses/${entry.file}`,
     fallbackUrl: `https://picsum.photos/seed/${fallbacks[i] ?? "golf" + i}/1400/500`,
     caption: entry.caption,
   }));
