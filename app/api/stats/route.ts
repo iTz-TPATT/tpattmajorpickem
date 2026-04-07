@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlayerStats, PGA_AVERAGES, PGA_STD_DEVS, toSD } from "@/lib/player-stats";
+import { getPlayerStats, getRecentForm, getAugustaHistory, PGA_AVERAGES, PGA_STD_DEVS, toSD } from "@/lib/player-stats";
 
 const KNOWN_ESPN_IDS: Record<string, string> = {
   "Scottie Scheffler": "4686091", "Rory McIlroy": "3470", "Jon Rahm": "3470580",
@@ -90,6 +90,27 @@ export async function GET(request: Request) {
       { label: "Drive\nAcc", value: toSD(seasonStats.fairwayPct, PGA_AVERAGES.fairwayPct, PGA_STD_DEVS.fairwayPct) },
     ];
     stats["__radar__"] = JSON.stringify(radarData);
+  }
+
+
+  // Recent form
+  const recentForm = getRecentForm(playerName);
+  if (recentForm) {
+    stats["── Recent Form ──"] = "";
+    const trendEmoji = recentForm.trend === "hot" ? "🔥" : recentForm.trend === "cold" ? "❄️" : recentForm.trend === "warm" ? "📈" : "〰️";
+    stats["Form"] = `${trendEmoji} ${recentForm.trend.charAt(0).toUpperCase() + recentForm.trend.slice(1)}`;
+    stats["Last 5"] = recentForm.results.map(([t, r]) => `${r}`).join("  ");
+    stats["Events"] = recentForm.results.map(([t]) => t).join("  ");
+  }
+
+  // Augusta history
+  const augusta = getAugustaHistory(playerName);
+  if (augusta) {
+    stats["── Augusta History ──"] = "";
+    stats["Starts"] = String(augusta.starts);
+    stats["Best Finish"] = augusta.bestFinish;
+    stats["Cuts Made"] = `${augusta.cuts}/${augusta.starts}`;
+    stats["Avg Score/Rd"] = augusta.avgScore >= 0 ? `+${augusta.avgScore.toFixed(1)}` : augusta.avgScore.toFixed(1);
   }
 
   return NextResponse.json({ stats });

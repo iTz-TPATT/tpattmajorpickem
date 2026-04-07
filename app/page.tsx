@@ -161,27 +161,23 @@ function getCourseData(tournamentId: string) {
   return COURSE_DATA[tournamentId] ?? null;
 }
 
-// ─── Texas Icon ───────────────────────────────────────────────────────────────
+// ─── Golf Ball Icon ────────────────────────────────────────────────────────────
 function TexasIcon({ size = 28, color = "white" }: { size?: number; color?: string }) {
+  // Gold golf ball outline with dimple pattern
   return (
-    <svg width={size} height={size * 0.85} viewBox="0 0 100 85" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M 8 2 L 62 2 L 62 8 L 70 8 L 70 14 L 76 14 L 76 20 L 82 20 L 82 28 L 88 28 L 88 36 L 94 36 L 94 48 L 88 48 L 88 54 L 82 60 L 76 62 L 70 68 L 64 72 L 58 78 L 52 82 L 48 80 L 44 76 L 38 70 L 30 66 L 22 60 L 16 54 L 10 46 L 6 38 L 4 30 L 4 22 L 6 14 L 8 8 Z"
-        stroke={color}
-        strokeWidth="3"
-        strokeLinejoin="round"
-        fill="none"
-        opacity="0.9"
-      />
-      {/* Panhandle notch */}
-      <path
-        d="M 8 2 L 8 14 L 4 14 L 4 22"
-        stroke={color}
-        strokeWidth="3"
-        strokeLinejoin="round"
-        fill="none"
-        opacity="0.9"
-      />
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Outer circle */}
+      <circle cx="20" cy="20" r="17" stroke={color} strokeWidth="2" fill="none" />
+      {/* Dimple pattern — small circles */}
+      <circle cx="20" cy="10" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="20" cy="30" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="10" cy="20" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="30" cy="20" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="13" cy="13" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="27" cy="13" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="13" cy="27" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="27" cy="27" r="1.8" fill={color} opacity="0.7" />
+      <circle cx="20" cy="20" r="1.8" fill={color} opacity="0.5" />
     </svg>
   );
 }
@@ -191,10 +187,10 @@ function RadarChart({ data, accent }: {
   data: { label: string; value: number }[]; // value in SDs (-3 to 3)
   accent: string;
 }) {
-  const size = 160;
+  const size = 130;
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = 62;
+  const maxR = 48;
   const n = data.length;
 
   function polar(angle: number, r: number) {
@@ -237,12 +233,12 @@ function RadarChart({ data, accent }: {
       ))}
       {/* Labels */}
       {data.map((d, i) => {
-        const lp = polar(i * angleStep, maxR + 14);
+        const lp = polar(i * angleStep, maxR + 16);
         const isLeft = lp.x < cx - 5;
         return (
           <text key={i} x={lp.x} y={lp.y + 4}
             textAnchor={isLeft ? "end" : lp.x > cx + 5 ? "start" : "middle"}
-            fontSize={8.5} fill="rgba(255,255,255,0.65)" fontFamily="EB Garamond, serif">
+            fontSize={7.5} fill="rgba(255,255,255,0.7)" fontFamily="EB Garamond, serif">
             {d.label}
           </text>
         );
@@ -280,7 +276,7 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
       position: "absolute", bottom: "110%", left: "50%", transform: "translateX(-50%)",
       background: "var(--bg-dark)", border: "1px solid var(--card-border)",
       borderRadius: 10, padding: "12px 14px", zIndex: 100,
-      minWidth: radarData ? 340 : 200, maxWidth: 380,
+      minWidth: radarData ? 310 : 200, maxWidth: 360,
       boxShadow: "0 8px 32px rgba(0,0,0,0.7)", pointerEvents: "none",
     }}>
       {!stats ? (
@@ -310,6 +306,47 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
                 </div>
               );
               if (v === "") return null;
+
+              // Last 5 results — render as colored mini-badges
+              if (k === "Last 5") {
+                const results = v.split(/\s+/);
+                return (
+                  <div key={k} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: "var(--cream-dim)", minWidth: 38 }}>Last 5</span>
+                    <div style={{ display: "flex", gap: 3 }}>
+                      {results.map((r, i) => {
+                        const isWin = r === "W";
+                        const isMC = r === "MC" || r === "WD";
+                        const num = parseInt(r.replace("T",""));
+                        const isTop5 = !isNaN(num) && num <= 5;
+                        const isTop10 = !isNaN(num) && num <= 10;
+                        const bg = isWin ? "var(--accent)" : isMC ? "rgba(192,57,43,0.4)" : isTop5 ? "rgba(93,186,126,0.35)" : isTop10 ? "rgba(93,186,126,0.18)" : "rgba(255,255,255,0.08)";
+                        const col = isWin ? "var(--bg)" : isMC ? "#e07b6f" : isTop5 ? "var(--score-low)" : "var(--cream-dim)";
+                        return (
+                          <span key={i} style={{ fontSize: 10, padding: "2px 5px", borderRadius: 4, background: bg, color: col, fontWeight: isWin ? 700 : 400 }}>
+                            {r}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Events row — render smaller below Last 5
+              if (k === "Events") {
+                return (
+                  <div key={k} style={{ display: "flex", gap: 4, marginBottom: 4, marginTop: -2 }}>
+                    <span style={{ fontSize: 11, color: "var(--cream-dim)", minWidth: 38 }}></span>
+                    <div style={{ display: "flex", gap: 3 }}>
+                      {v.split(/\s+/).map((e, i) => (
+                        <span key={i} style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", width: 28, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e}</span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 3, fontSize: 12 }}>
                   <span style={{ color: "var(--cream-dim)", whiteSpace: "nowrap" }}>{k}</span>
@@ -570,7 +607,7 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
 
   return (
     <div style={{
-      position: "relative", width: "100%", height: 280,
+      position: "relative", width: "100%", height: 240,
       overflow: "hidden",
       background: "linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-dark) 40%, var(--bg-mid) 100%)",
     }}>
@@ -594,7 +631,7 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
           style={{
             position: "absolute", inset: 0,
             width: "100%", height: "100%",
-            objectFit: "cover", objectPosition: "center 40%",
+            objectFit: "cover", objectPosition: "center center",
             transition: `opacity ${FADE_MS}ms ease`,
             opacity,
           }}
@@ -1208,6 +1245,110 @@ function CourseTab({ tournament }: { tournament: Tournament }) {
   );
 }
 
+
+// ─── Tournament Day Banner ────────────────────────────────────────────────────
+const TOURNAMENT_DAYS: Record<string, { round: string; title: string; subtitle: string; emoji: string }> = {
+  "2026-04-09": { round: "Round 1", title: "First Tee Thursday",     subtitle: "The first tee shots are in the air. Let's go.",       emoji: "🌅" },
+  "2026-04-10": { round: "Round 2", title: "Cut Line Friday",        subtitle: "Survive today and play the weekend.",                  emoji: "✂️" },
+  "2026-04-11": { round: "Round 3", title: "Moving Day",             subtitle: "Time to make your move up the leaderboard.",          emoji: "🚀" },
+  "2026-04-12": { round: "Round 4", title: "Green Jacket Sunday",    subtitle: "A green jacket is on the line. Best day in golf.",    emoji: "🏆" },
+};
+
+function TournamentDayBanner() {
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Get today's date in ET
+    const now = new Date();
+    const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+    const today = et.toISOString().slice(0, 10);
+    const dayData = TOURNAMENT_DAYS[today];
+    if (!dayData) return;
+
+    const showTimer = setTimeout(() => { setMounted(true); setVisible(true); }, 800);
+    const hideTimer = setTimeout(() => { setVisible(false); }, 6000);
+    const unmountTimer = setTimeout(() => { setMounted(false); }, 6700);
+    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); clearTimeout(unmountTimer); };
+  }, []);
+
+  if (!mounted) return null;
+
+  return (
+    <div style={{
+      position: "fixed", top: 80, right: 16, zIndex: 9999, pointerEvents: "none",
+      transform: visible ? "translateX(0)" : "translateX(120%)",
+      opacity: visible ? 1 : 0,
+      transition: "transform 500ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease",
+    }}>
+      <div style={{
+        minWidth: 260, maxWidth: 320, borderRadius: 14, padding: "14px 16px",
+        background: "linear-gradient(135deg, #0b3d2e 0%, #155734 50%, #1a6b40 100%)",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12)",
+        border: "1px solid rgba(201,168,76,0.35)",
+      }}>
+        {/* Header row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(201,168,76,0.15)", fontSize: 18,
+            border: "1px solid rgba(201,168,76,0.3)",
+          }}>
+            {Object.values(TOURNAMENT_DAYS).find(d => d.title === Object.values(TOURNAMENT_DAYS).find(x => x.emoji)?.title)?.emoji ?? "⛳"}
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(201,168,76,0.85)", marginBottom: 2 }}>
+              The Masters 2026
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em" }}>
+              {Object.entries(TOURNAMENT_DAYS).find(([, v]) => v.title === Object.entries(TOURNAMENT_DAYS).find(([k]) => {
+                const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+                return k === et.toISOString().slice(0, 10);
+              })?.[0])?.[1]?.round ?? ""}
+            </div>
+          </div>
+        </div>
+        {/* Title */}
+        <BannerContent />
+      </div>
+    </div>
+  );
+}
+
+function BannerContent() {
+  const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const today = et.toISOString().slice(0, 10);
+  const day = TOURNAMENT_DAYS[today];
+  if (!day) return null;
+  return (
+    <>
+      <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 6 }}>
+        {day.emoji} {day.title}
+      </div>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", lineHeight: 1.5, borderTop: "1px solid rgba(201,168,76,0.2)", paddingTop: 8 }}>
+        {day.subtitle}
+      </div>
+      {/* Round indicator dots */}
+      <div style={{ display: "flex", gap: 4, marginTop: 10, justifyContent: "center" }}>
+        {["R1","R2","R3","R4"].map((r, i) => {
+          const roundDate = ["2026-04-09","2026-04-10","2026-04-11","2026-04-12"][i];
+          const isToday = roundDate === today;
+          const isPast = roundDate < today;
+          return (
+            <div key={r} style={{
+              padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: isToday ? 700 : 400,
+              background: isToday ? "rgba(201,168,76,0.3)" : isPast ? "rgba(255,255,255,0.08)" : "transparent",
+              color: isToday ? "rgba(201,168,76,1)" : isPast ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.2)",
+              border: isToday ? "1px solid rgba(201,168,76,0.4)" : "1px solid rgba(255,255,255,0.1)",
+            }}>{r}</div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function Page() {
   const [hydrated, setHydrated] = useState(false);
@@ -1270,6 +1411,7 @@ export default function Page() {
 
   return (
     <div style={{ minHeight: "100vh", background: th.bg, color: th.cream, fontFamily: "EB Garamond, serif", paddingBottom: 80, ...themeVars(tournament) }}>
+      <TournamentDayBanner />
       {/* Header */}
       <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
         <div>
