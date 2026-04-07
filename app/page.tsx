@@ -151,34 +151,47 @@ const inputStyle: React.CSSProperties = {
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "reset">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [resetCode, setResetCode] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function switchMode(m: "login" | "register") {
-    setMode(m); setError("");
-    setUsername(""); setPassword(""); setConfirmPassword(""); setInviteCode("");
+  function switchMode(m: "login" | "register" | "reset") {
+    setMode(m); setError(""); setSuccess("");
+    setUsername(""); setPassword(""); setConfirmPassword("");
+    setInviteCode(""); setResetCode("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(""); 
+    setError(""); setSuccess("");
 
     if (mode === "register") {
+      if (password !== confirmPassword) { setError("Passwords don't match"); return; }
+      if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    }
+    if (mode === "reset") {
       if (password !== confirmPassword) { setError("Passwords don't match"); return; }
       if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     }
 
     setLoading(true);
     try {
-      const endpoint = mode === "login" ? "/api/auth" : "/api/register";
-      const body = mode === "login"
-        ? { username: username.trim(), password }
-        : { username: username.trim(), password, inviteCode: inviteCode.trim() };
+      let endpoint = "/api/auth";
+      let body: Record<string, string> = { username: username.trim(), password };
+
+      if (mode === "register") {
+        endpoint = "/api/register";
+        body = { username: username.trim(), password, inviteCode: inviteCode.trim() };
+      } else if (mode === "reset") {
+        endpoint = "/api/reset-password";
+        body = { username: username.trim(), newPassword: password, resetCode: resetCode.trim() };
+      }
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -192,6 +205,12 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) =
     finally { setLoading(false); }
   }
 
+  const subtitles: Record<typeof mode, string> = {
+    login: "Welcome back — sign in to submit your picks",
+    register: "New here? Create your account below",
+    reset: "Enter your name, a new password, and the reset code from the commissioner",
+  };
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--green-deep)", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
@@ -201,27 +220,37 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) =
           <p style={{ color: "var(--cream-dim)", fontSize: 14, letterSpacing: "0.1em", textTransform: "uppercase" }}>Masters 2026</p>
         </div>
 
-        {/* Mode toggle */}
-        <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", border: "1px solid var(--card-border)", borderRadius: 8, padding: 4, marginBottom: 20 }}>
-          {(["login", "register"] as const).map(m => (
-            <button key={m} onClick={() => switchMode(m)} style={{
-              flex: 1, padding: "9px 0", border: "none", borderRadius: 6,
-              background: mode === m ? "var(--gold)" : "transparent",
-              color: mode === m ? "var(--green-deep)" : "var(--cream-dim)",
-              fontSize: 14, fontFamily: "Playfair Display, serif",
-              fontWeight: mode === m ? 600 : 400, cursor: "pointer", transition: "all 0.2s",
-            }}>
-              {m === "login" ? "Sign In" : "Create Account"}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — Sign In / Create Account */}
+        {mode !== "reset" && (
+          <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", border: "1px solid var(--card-border)", borderRadius: 8, padding: 4, marginBottom: 20 }}>
+            {(["login", "register"] as const).map(m => (
+              <button key={m} onClick={() => switchMode(m)} style={{
+                flex: 1, padding: "9px 0", border: "none", borderRadius: 6,
+                background: mode === m ? "var(--gold)" : "transparent",
+                color: mode === m ? "var(--green-deep)" : "var(--cream-dim)",
+                fontSize: 14, fontFamily: "Playfair Display, serif",
+                fontWeight: mode === m ? 600 : 400, cursor: "pointer", transition: "all 0.2s",
+              }}>
+                {m === "login" ? "Sign In" : "Create Account"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Reset mode back button */}
+        {mode === "reset" && (
+          <button onClick={() => switchMode("login")} style={{ background: "none", border: "none", color: "var(--cream-dim)", cursor: "pointer", fontSize: 14, marginBottom: 16, padding: 0 }}>
+            ← Back to sign in
+          </button>
+        )}
 
         <div style={{ ...S.card, padding: 28 }}>
           <h2 style={{ fontSize: 15, color: "var(--cream-dim)", marginBottom: 24, fontWeight: 400, fontStyle: "italic" }}>
-            {mode === "login" ? "Welcome back — sign in to submit your picks" : "New here? Create your account below"}
+            {subtitles[mode]}
           </h2>
 
           {error && <div style={S.errorBox}>{error}</div>}
+          {success && <div style={S.successBox}>{success}</div>}
 
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>
@@ -229,29 +258,54 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) =
               <input value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Your first name" autoComplete="username" />
             </div>
 
-            <div style={{ marginBottom: mode === "register" ? 16 : 24 }}>
-              <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Password</label>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+                {mode === "reset" ? "New Password" : "Password"}
+              </label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} />
             </div>
 
-            {mode === "register" && (
-              <>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Confirm Password</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="••••••••" autoComplete="new-password" />
-                </div>
-                <div style={{ marginBottom: 24 }}>
-                  <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Invite Code</label>
-                  <input value={inviteCode} onChange={e => setInviteCode(e.target.value)} style={inputStyle} placeholder="Get this from the group chat" />
-                </div>
-              </>
+            {(mode === "register" || mode === "reset") && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Confirm Password</label>
+                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="••••••••" autoComplete="new-password" />
+              </div>
             )}
 
+            {mode === "register" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Invite Code</label>
+                <input value={inviteCode} onChange={e => setInviteCode(e.target.value)} style={inputStyle} placeholder="Get this from the group chat" />
+              </div>
+            )}
+
+            {mode === "reset" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Reset Code</label>
+                <input value={resetCode} onChange={e => setResetCode(e.target.value)} style={inputStyle} placeholder="Get this from Trenton" />
+              </div>
+            )}
+
+            <div style={{ marginTop: 8, marginBottom: 0 }} />
+
             <button type="submit" disabled={loading} style={{ ...S.submitBtn, opacity: loading ? 0.7 : 1 }}>
-              {loading ? (mode === "login" ? "Signing in…" : "Creating account…") : (mode === "login" ? "Sign In" : "Create Account")}
+              {loading
+                ? "Please wait…"
+                : mode === "login" ? "Sign In"
+                : mode === "register" ? "Create Account"
+                : "Reset Password"}
             </button>
           </form>
         </div>
+
+        {/* Forgot password link */}
+        {mode === "login" && (
+          <p style={{ textAlign: "center", marginTop: 16 }}>
+            <button onClick={() => switchMode("reset")} style={{ background: "none", border: "none", color: "var(--cream-dim)", cursor: "pointer", fontSize: 13, fontStyle: "italic", textDecoration: "underline" }}>
+              Forgot your password?
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
