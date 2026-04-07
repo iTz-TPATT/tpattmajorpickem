@@ -345,17 +345,21 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
   const photo = photos[idx];
 
   return (
-    <div style={{ position: "relative", width: "100%", height: 220, overflow: "hidden" }}>
+    <div style={{ position: "relative", width: "100%", height: 280, overflow: "hidden" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={photo.url}
         alt={photo.caption}
         style={{
-          width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%",
+          width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center",
           transition: "opacity 0.6s ease", opacity: fading ? 0 : 1,
           display: "block",
         }}
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        onError={(e) => {
+          // Try next photo on error rather than blank
+          (e.target as HTMLImageElement).style.display = "none";
+          setIdx((i) => (i + 1) % photos.length);
+        }}
       />
       {/* Dark gradient overlay — bottom to top for text legibility */}
       <div style={{
@@ -439,6 +443,7 @@ function MyPicksTab({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saved, setSaved] = useState(false);
+  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha">("leaderboard");
 
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
 
@@ -487,13 +492,16 @@ function MyPicksTab({
     finally { setSubmitting(false); }
   }
 
-  // Build sorted golfer list: available first, then burned, then cut
+  // Build sorted golfer list based on sortMode
   const sortedGolfers = [...scores].sort((a, b) => {
     const aAvail = !burnedSet.has(a.name) && a.status === "active";
     const bAvail = !burnedSet.has(b.name) && b.status === "active";
+    // Always put unavailable (burned/cut) players at the bottom
     if (aAvail && !bAvail) return -1;
     if (!aAvail && bAvail) return 1;
-    return a.totalScore - b.totalScore;
+    // Within available: sort by selected mode
+    if (sortMode === "alpha") return a.name.localeCompare(b.name);
+    return a.totalScore - b.totalScore; // leaderboard order
   });
 
   const scoringNote = round <= 2
