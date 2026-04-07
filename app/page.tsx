@@ -36,10 +36,17 @@ function PlayerAvatar({ username, size = 32, style }: {
   size?: number;
   style?: React.CSSProperties;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [srcIndex, setSrcIndex] = useState(0);
   const initials = username.trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? "").slice(0, 2).join("");
-  // Generate a consistent color from the username
   const hue = username.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+
+  // Try jpg first, then png, then show initials
+  const slug = username.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, "-");
+  const srcs = [`/avatars/${slug}.jpg`, `/avatars/${slug}.png`];
+  const currentSrc = srcs[srcIndex];
 
   return (
     <div style={{
@@ -50,12 +57,12 @@ function PlayerAvatar({ username, size = 32, style }: {
       display: "flex", alignItems: "center", justifyContent: "center",
       ...style,
     }}>
-      {!failed ? (
+      {currentSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={avatarUrl(username)}
+          src={currentSrc}
           alt={username}
-          onError={() => setFailed(true)}
+          onError={() => setSrcIndex(prev => prev + 1)}
           style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }}
         />
       ) : (
