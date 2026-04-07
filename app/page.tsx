@@ -1,235 +1,236 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { GOLFERS } from "@/lib/golfers";
-import { ROUND_LABELS, ROUND_REVEAL_TIMES } from "@/lib/rounds";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  TOURNAMENTS, getActiveTournament, getCurrentRound, isRoundRevealed,
+  isTournamentStarted, calcRoundScore, ROUND_LABELS, Tournament, TournamentId,
+} from "@/lib/tournaments";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Pick { username: string; user_id: string; round_number: number; golfer: string; }
-interface GolferScore { golfer: string; r1: number|null; r2: number|null; r3: number|null; r4: number|null; total_score: number; position: string|null; status: string; }
+interface GolferScore {
+  name: string; espnId: string; headshot: string | null;
+  totalScore: number; position: string; status: string;
+  r1: number | null; r2: number | null; r3: number | null; r4: number | null;
+}
 type Tab = "picks" | "leaderboard" | "history";
 
-// ─── Round helpers (client-safe, no Node imports) ─────────────────────────────
-const REVEAL_TIMES: Record<number, string> = ROUND_REVEAL_TIMES;
-
-function isRevealed(round: number) { return new Date() >= new Date(REVEAL_TIMES[round]); }
-function getCurrentRound() {
-  for (let r = 1; r <= 4; r++) { if (new Date() < new Date(REVEAL_TIMES[r])) return r; }
-  return 4;
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function fmtScore(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  if (n === 0) return "E";
+  return n > 0 ? `+${n}` : `${n}`;
 }
-function fmtCountdown(to: Date) {
+
+function fmtCountdown(to: Date): string {
   const diff = to.getTime() - Date.now();
-  if (diff <= 0) return "Picks revealed";
+  if (diff <= 0) return "Picks locked";
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
-  if (h > 24) { const d = Math.floor(h / 24); return `${d}d ${h % 24}h`; }
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
   return `${h}h ${m}m ${s}s`;
 }
-function fmtScore(s: number | null) {
-  if (s === null || s === undefined) return "—";
-  if (s === 0) return "E";
-  return s > 0 ? `+${s}` : `${s}`;
+
+function getRoundScore(golfer: GolferScore | undefined, round: number): number | null {
+  if (!golfer) return null;
+  return [null, golfer.r1, golfer.r2, golfer.r3, golfer.r4][round] ?? null;
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const S = {
-  page: { minHeight: "100vh", background: "var(--green-deep)", padding: "0 0 80px" } as React.CSSProperties,
-  header: {
-    background: "linear-gradient(180deg, #071510 0%, #0f2318 100%)",
-    borderBottom: "1px solid var(--card-border)",
-    padding: "24px 24px 20px",
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    position: "sticky" as const, top: 0, zIndex: 50,
-  },
-  logo: { display: "flex", flexDirection: "column" as const, gap: 2 },
-  logoTitle: { fontSize: 22, color: "var(--gold)", lineHeight: 1.1 },
-  logoSub: { fontSize: 13, color: "var(--cream-dim)", letterSpacing: "0.12em", textTransform: "uppercase" as const, fontFamily: "EB Garamond, serif" },
-  userInfo: { display: "flex", alignItems: "center", gap: 12 },
-  userName: { fontSize: 15, color: "var(--cream-dim)", fontStyle: "italic" },
-  logoutBtn: {
-    background: "transparent", border: "1px solid var(--card-border)",
-    color: "var(--cream-dim)", padding: "6px 14px", borderRadius: 6,
-    fontSize: 13, cursor: "pointer", transition: "all 0.2s",
-  },
-  tabs: {
-    display: "flex", gap: 0,
-    borderBottom: "1px solid var(--card-border)",
-    background: "var(--green-dark)",
-    padding: "0 24px",
-    position: "sticky" as const, top: 73, zIndex: 40,
-  },
-  tab: (active: boolean): React.CSSProperties => ({
-    padding: "14px 24px",
-    fontSize: 15,
-    background: "transparent",
-    border: "none",
-    borderBottom: active ? "2px solid var(--gold)" : "2px solid transparent",
-    color: active ? "var(--gold)" : "var(--cream-dim)",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    fontFamily: "Playfair Display, serif",
-    fontWeight: active ? 600 : 400,
-    letterSpacing: "0.02em",
-  }),
-  content: { maxWidth: 680, margin: "0 auto", padding: "32px 24px" },
-  card: {
-    background: "var(--card-bg)",
-    border: "1px solid var(--card-border)",
-    borderRadius: "var(--radius)",
-    padding: "24px",
-    marginBottom: 20,
-  } as React.CSSProperties,
-  cardTitle: { fontSize: 18, color: "var(--gold)", marginBottom: 16 },
-  golferGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
-  golferBtn: (selected: boolean, disabled: boolean): React.CSSProperties => ({
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "10px 14px",
-    background: selected ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.03)",
-    border: `1px solid ${selected ? "var(--gold)" : "rgba(255,255,255,0.08)"}`,
-    borderRadius: 8,
-    color: selected ? "var(--gold)" : disabled ? "var(--cream-dim)" : "var(--cream)",
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 14,
-    transition: "all 0.15s",
-    opacity: disabled && !selected ? 0.5 : 1,
-  }),
-  submitBtn: {
-    width: "100%", padding: "14px",
-    background: "var(--gold)", color: "var(--green-deep)",
-    border: "none", borderRadius: 8, fontSize: 16,
-    fontFamily: "Playfair Display, serif", fontWeight: 600,
-    cursor: "pointer", marginTop: 16, transition: "opacity 0.2s",
-  } as React.CSSProperties,
-  pill: (color: string): React.CSSProperties => ({
-    display: "inline-block", padding: "2px 10px",
-    borderRadius: 20, fontSize: 12,
-    background: color === "gold" ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.06)",
-    color: color === "gold" ? "var(--gold)" : "var(--cream-dim)",
-    border: `1px solid ${color === "gold" ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.1)"}`,
-  }),
-  divider: { height: 1, background: "var(--card-border)", margin: "16px 0" } as React.CSSProperties,
-  score: (n: number | null): React.CSSProperties => ({
-    fontFamily: "monospace", fontSize: 14,
-    color: n === null ? "var(--cream-dim)" : n < 0 ? "#5dba7e" : n > 0 ? "var(--red)" : "var(--cream)",
-  }),
-  lbRow: (rank: number): React.CSSProperties => ({
-    display: "flex", alignItems: "center", gap: 16,
-    padding: "14px 18px",
-    background: rank === 1 ? "rgba(201,168,76,0.08)" : "rgba(255,255,255,0.02)",
-    border: `1px solid ${rank === 1 ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.06)"}`,
-    borderRadius: 8, marginBottom: 8,
-  }),
-  lbRank: (rank: number): React.CSSProperties => ({
-    width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
-    background: rank === 1 ? "var(--gold)" : "rgba(255,255,255,0.08)",
-    color: rank === 1 ? "var(--green-deep)" : "var(--cream-dim)",
-    borderRadius: "50%", fontSize: 13, fontWeight: 700, flexShrink: 0,
-  }),
-  errorBox: {
-    background: "rgba(192,57,43,0.12)", border: "1px solid rgba(192,57,43,0.3)",
-    borderRadius: 8, padding: "12px 16px", color: "#e07b6f", marginBottom: 16, fontSize: 14,
-  } as React.CSSProperties,
-  successBox: {
-    background: "rgba(93,186,126,0.12)", border: "1px solid rgba(93,186,126,0.3)",
-    borderRadius: 8, padding: "12px 16px", color: "#5dba7e", marginBottom: 16, fontSize: 14,
-  } as React.CSSProperties,
-  countdownBadge: {
-    display: "inline-flex", alignItems: "center", gap: 6,
-    background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.25)",
-    borderRadius: 6, padding: "6px 12px", fontSize: 13, color: "var(--gold)", marginBottom: 16,
-  } as React.CSSProperties,
-};
+// ─── Theme helpers ────────────────────────────────────────────────────────────
+function themeVars(t: Tournament): React.CSSProperties {
+  const th = t.theme;
+  return {
+    "--bg": th.bg, "--bg-dark": th.bgDark, "--bg-mid": th.bgMid,
+    "--accent": th.accent, "--accent-light": th.accentLight,
+    "--cream": th.cream, "--cream-dim": th.creamDim,
+    "--card-bg": th.cardBg, "--card-border": th.cardBorder,
+    "--score-low": th.scoreLow, "--score-high": th.scoreHigh,
+  } as React.CSSProperties;
+}
 
-// ─── Shared input style ───────────────────────────────────────────────────────
-const inputStyle: React.CSSProperties = {
+const inp: React.CSSProperties = {
   width: "100%", padding: "10px 14px",
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid var(--card-border)",
+  background: "rgba(255,255,255,0.05)", border: "1px solid var(--card-border)",
   borderRadius: 8, color: "var(--cream)", fontSize: 15, outline: "none",
+  fontFamily: "EB Garamond, serif",
 };
 
-// ─── Login Screen ─────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) => void }) {
+// ─── Shared card style ────────────────────────────────────────────────────────
+const card: React.CSSProperties = {
+  background: "var(--card-bg)", border: "1px solid var(--card-border)",
+  borderRadius: 10, padding: "20px 22px", marginBottom: 16,
+};
+
+// ─── Score color ──────────────────────────────────────────────────────────────
+function scoreColor(n: number | null): string {
+  if (n === null) return "var(--cream-dim)";
+  if (n < 0) return "var(--score-low)";
+  if (n > 0) return "var(--score-high)";
+  return "var(--cream)";
+}
+
+// ─── Player Stats Tooltip ─────────────────────────────────────────────────────
+function StatsTooltip({ espnId, visible }: { espnId: string; visible: boolean }) {
+  const [stats, setStats] = useState<Record<string, string> | null>(null);
+  const fetched = useRef(false);
+
+  useEffect(() => {
+    if (!visible || fetched.current || !espnId) return;
+    fetched.current = true;
+    fetch(`/api/stats?espnId=${espnId}`)
+      .then((r) => r.json())
+      .then((d) => setStats(d.stats))
+      .catch(() => null);
+  }, [visible, espnId]);
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      position: "absolute", bottom: "110%", left: "50%", transform: "translateX(-50%)",
+      background: "var(--bg-dark)", border: "1px solid var(--card-border)",
+      borderRadius: 8, padding: "10px 14px", zIndex: 100, minWidth: 180,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.5)", pointerEvents: "none",
+    }}>
+      {!stats ? (
+        <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Loading stats…</div>
+      ) : Object.keys(stats).length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Stats unavailable</div>
+      ) : (
+        Object.entries(stats).map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 4, fontSize: 13 }}>
+            <span style={{ color: "var(--cream-dim)" }}>{k}</span>
+            <span style={{ color: "var(--cream)", fontWeight: 500 }}>{v}</span>
+          </div>
+        ))
+      )}
+      <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "6px solid var(--card-border)" }} />
+    </div>
+  );
+}
+
+// ─── Golfer Card ──────────────────────────────────────────────────────────────
+function GolferCard({
+  name, score, selected, burned, cut, disabled, odds, espnId, headshot, onClick,
+}: {
+  name: string; score: GolferScore | undefined; selected: boolean; burned: boolean;
+  cut: boolean; disabled: boolean; odds: string; espnId: string; headshot: string | null;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const totalScore = score?.totalScore ?? null;
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ position: "relative" }}
+    >
+      <button
+        onClick={onClick}
+        disabled={disabled || burned || cut}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+          background: selected ? "rgba(var(--accent-rgb, 201,168,76), 0.15)" : burned || cut ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${selected ? "var(--accent)" : burned || cut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.08)"}`,
+          borderRadius: 8, cursor: burned || cut || disabled ? "not-allowed" : "pointer",
+          opacity: burned || cut ? 0.45 : 1, transition: "all 0.15s", textAlign: "left",
+        }}
+      >
+        {/* Headshot */}
+        <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)" }}>
+          {headshot ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={headshot} alt={name} width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          ) : (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "var(--cream-dim)" }}>
+              {name[0]}
+            </div>
+          )}
+        </div>
+
+        {/* Name & badges */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, color: selected ? "var(--accent)" : burned || cut ? "var(--cream-dim)" : "var(--cream)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {name}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 2, alignItems: "center" }}>
+            {burned && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", color: "var(--cream-dim)", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>USED</span>}
+            {cut && <span style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "#e07b6f", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>CUT</span>}
+            {odds && !burned && !cut && <span style={{ fontSize: 11, color: "var(--accent-light, var(--accent))", opacity: 0.8 }}>{odds}</span>}
+            {score?.position && !burned && !cut && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+          </div>
+        </div>
+
+        {/* Score */}
+        <div style={{ fontSize: 15, fontFamily: "monospace", color: scoreColor(totalScore), flexShrink: 0 }}>
+          {fmtScore(totalScore)}
+        </div>
+      </button>
+
+      {/* Hover stats tooltip */}
+      {hover && espnId && !burned && !cut && (
+        <StatsTooltip espnId={espnId} visible={hover} />
+      )}
+    </div>
+  );
+}
+
+// ─── Login / Register / Reset Screen ─────────────────────────────────────────
+function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: (token: string, username: string) => void }) {
   const [mode, setMode] = useState<"login" | "register" | "reset">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
-  const [resetCode, setResetCode] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const th = tournament.theme;
 
-  function switchMode(m: "login" | "register" | "reset") {
-    setMode(m); setError(""); setSuccess("");
-    setUsername(""); setPassword(""); setConfirmPassword("");
-    setInviteCode(""); setResetCode("");
+  function switchMode(m: typeof mode) {
+    setMode(m); setError("");
+    setUsername(""); setPassword(""); setConfirm(""); setCode("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(""); setSuccess("");
-
-    if (mode === "register") {
-      if (password !== confirmPassword) { setError("Passwords don't match"); return; }
-      if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
-    }
-    if (mode === "reset") {
-      if (password !== confirmPassword) { setError("Passwords don't match"); return; }
-      if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
-    }
-
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setError("");
+    if ((mode === "register" || mode === "reset") && password !== confirm) { setError("Passwords don't match"); return; }
+    if ((mode === "register" || mode === "reset") && password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
     try {
-      let endpoint = "/api/auth";
-      let body: Record<string, string> = { username: username.trim(), password };
-
-      if (mode === "register") {
-        endpoint = "/api/register";
-        body = { username: username.trim(), password, inviteCode: inviteCode.trim() };
-      } else if (mode === "reset") {
-        endpoint = "/api/reset-password";
-        body = { username: username.trim(), newPassword: password, resetCode: resetCode.trim() };
-      }
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const endpoints = { login: "/api/auth", register: "/api/register", reset: "/api/reset-password" };
+      const bodies = {
+        login: { username: username.trim(), password },
+        register: { username: username.trim(), password, inviteCode: code.trim() },
+        reset: { username: username.trim(), newPassword: password, resetCode: code.trim() },
+      };
+      const res = await fetch(endpoints[mode], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodies[mode]) });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Something went wrong"); return; }
+      if (!res.ok) { setError(data.error ?? "Something went wrong"); return; }
       onLogin(data.token, data.username);
     } catch { setError("Network error — please try again"); }
     finally { setLoading(false); }
   }
 
-  const subtitles: Record<typeof mode, string> = {
-    login: "Welcome back — sign in to submit your picks",
-    register: "New here? Create your account below",
-    reset: "Enter your name, a new password, and the reset code from the commissioner",
-  };
-
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--green-deep)", padding: 24 }}>
+    <div style={{ minHeight: "100vh", background: th.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, ...themeVars(tournament) }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>⛳</div>
-          <h1 style={{ fontSize: 28, color: "var(--gold)", marginBottom: 6 }}>Major Pick&apos;em</h1>
-          <p style={{ color: "var(--cream-dim)", fontSize: 14, letterSpacing: "0.1em", textTransform: "uppercase" }}>Masters 2026</p>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ fontSize: 52, marginBottom: 10 }}>{th.emoji}</div>
+          <h1 style={{ fontSize: 26, color: th.accent, fontFamily: "Playfair Display, serif", marginBottom: 4 }}>Major Pick&apos;em</h1>
+          <p style={{ color: th.creamDim, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase" }}>{tournament.shortName} {tournament.year}</p>
         </div>
 
-        {/* Mode toggle — Sign In / Create Account */}
         {mode !== "reset" && (
-          <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", border: "1px solid var(--card-border)", borderRadius: 8, padding: 4, marginBottom: 20 }}>
-            {(["login", "register"] as const).map(m => (
+          <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", border: "1px solid var(--card-border)", borderRadius: 8, padding: 4, marginBottom: 18 }}>
+            {(["login", "register"] as const).map((m) => (
               <button key={m} onClick={() => switchMode(m)} style={{
                 flex: 1, padding: "9px 0", border: "none", borderRadius: 6,
-                background: mode === m ? "var(--gold)" : "transparent",
-                color: mode === m ? "var(--green-deep)" : "var(--cream-dim)",
+                background: mode === m ? th.accent : "transparent",
+                color: mode === m ? th.bg : th.creamDim,
                 fontSize: 14, fontFamily: "Playfair Display, serif",
-                fontWeight: mode === m ? 600 : 400, cursor: "pointer", transition: "all 0.2s",
+                fontWeight: mode === m ? 600 : 400, cursor: "pointer",
               }}>
                 {m === "login" ? "Sign In" : "Create Account"}
               </button>
@@ -237,71 +238,64 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) =
           </div>
         )}
 
-        {/* Reset mode back button */}
         {mode === "reset" && (
-          <button onClick={() => switchMode("login")} style={{ background: "none", border: "none", color: "var(--cream-dim)", cursor: "pointer", fontSize: 14, marginBottom: 16, padding: 0 }}>
+          <button onClick={() => switchMode("login")} style={{ background: "none", border: "none", color: th.creamDim, cursor: "pointer", fontSize: 13, marginBottom: 14, padding: 0 }}>
             ← Back to sign in
           </button>
         )}
 
-        <div style={{ ...S.card, padding: 28 }}>
-          <h2 style={{ fontSize: 15, color: "var(--cream-dim)", marginBottom: 24, fontWeight: 400, fontStyle: "italic" }}>
-            {subtitles[mode]}
-          </h2>
+        <div style={{ ...card }}>
+          <p style={{ fontSize: 14, color: th.creamDim, marginBottom: 20, fontStyle: "italic" }}>
+            {mode === "login" ? "Sign in to submit your picks" : mode === "register" ? "Create your account below" : "Reset your password with the commissioner code"}
+          </p>
 
-          {error && <div style={S.errorBox}>{error}</div>}
-          {success && <div style={S.successBox}>{success}</div>}
+          {error && <div style={{ background: "rgba(192,57,43,0.12)", border: "1px solid rgba(192,57,43,0.3)", borderRadius: 8, padding: "10px 14px", color: "#e07b6f", marginBottom: 14, fontSize: 14 }}>{error}</div>}
 
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Name</label>
-              <input value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Your first name" autoComplete="username" />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
-                {mode === "reset" ? "New Password" : "Password"}
-              </label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} />
-            </div>
+          <form onSubmit={submit}>
+            {["Name", mode === "reset" ? "New Password" : "Password"].map((label, i) => (
+              <div key={label} style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, color: th.creamDim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{label}</label>
+                <input
+                  type={i === 1 ? "password" : "text"}
+                  value={i === 0 ? username : password}
+                  onChange={(e) => i === 0 ? setUsername(e.target.value) : setPassword(e.target.value)}
+                  style={inp} placeholder={i === 0 ? "Your first name" : "••••••••"}
+                  autoComplete={i === 0 ? "username" : mode === "login" ? "current-password" : "new-password"}
+                />
+              </div>
+            ))}
 
             {(mode === "register" || mode === "reset") && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Confirm Password</label>
-                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="••••••••" autoComplete="new-password" />
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, color: th.creamDim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Confirm Password</label>
+                <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} style={inp} placeholder="••••••••" autoComplete="new-password" />
               </div>
             )}
 
-            {mode === "register" && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Invite Code</label>
-                <input value={inviteCode} onChange={e => setInviteCode(e.target.value)} style={inputStyle} placeholder="Get this from the group chat" />
+            {(mode === "register" || mode === "reset") && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, color: th.creamDim, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>
+                  {mode === "register" ? "Invite Code" : "Reset Code (from Trenton)"}
+                </label>
+                <input value={code} onChange={(e) => setCode(e.target.value)} style={inp} placeholder={mode === "register" ? "From the group chat" : "trentonisthebest"} />
               </div>
             )}
 
-            {mode === "reset" && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Reset Code</label>
-                <input value={resetCode} onChange={e => setResetCode(e.target.value)} style={inputStyle} placeholder="Get this from Trenton" />
-              </div>
-            )}
-
-            <div style={{ marginTop: 8, marginBottom: 0 }} />
-
-            <button type="submit" disabled={loading} style={{ ...S.submitBtn, opacity: loading ? 0.7 : 1 }}>
-              {loading
-                ? "Please wait…"
-                : mode === "login" ? "Sign In"
-                : mode === "register" ? "Create Account"
-                : "Reset Password"}
+            <button type="submit" disabled={loading} style={{
+              width: "100%", padding: "13px", marginTop: 6,
+              background: th.accent, color: th.bg,
+              border: "none", borderRadius: 8, fontSize: 16,
+              fontFamily: "Playfair Display, serif", fontWeight: 600,
+              cursor: "pointer", opacity: loading ? 0.7 : 1,
+            }}>
+              {loading ? "Please wait…" : mode === "login" ? "Sign In" : mode === "register" ? "Create Account" : "Reset Password"}
             </button>
           </form>
         </div>
 
-        {/* Forgot password link */}
         {mode === "login" && (
-          <p style={{ textAlign: "center", marginTop: 16 }}>
-            <button onClick={() => switchMode("reset")} style={{ background: "none", border: "none", color: "var(--cream-dim)", cursor: "pointer", fontSize: 13, fontStyle: "italic", textDecoration: "underline" }}>
+          <p style={{ textAlign: "center", marginTop: 14 }}>
+            <button onClick={() => switchMode("reset")} style={{ background: "none", border: "none", color: th.creamDim, cursor: "pointer", fontSize: 13, fontStyle: "italic", textDecoration: "underline" }}>
               Forgot your password?
             </button>
           </p>
@@ -311,27 +305,139 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, username: string) =
   );
 }
 
-// ─── My Picks Tab ─────────────────────────────────────────────────────────────
-function MyPicksTab({ token, userId, allPicks, scores, onPicksChanged }: {
-  token: string; userId: string; allPicks: Pick[];
-  scores: GolferScore[]; onPicksChanged: () => void;
-}) {
-  const round = getCurrentRound();
-  const revealed = isRevealed(round);
-  const revealDate = new Date(REVEAL_TIMES[round]);
+// ─── Course Hero ──────────────────────────────────────────────────────────────
+function CourseHero({ tournament }: { tournament: Tournament }) {
+  const photos = tournament.theme.photos;
+  const [idx, setIdx] = useState(0);
+  const [fading, setFading] = useState(false);
 
-  const myPicksThisRound = allPicks.filter(p => p.user_id === userId && p.round_number === round).map(p => p.golfer);
-  const [selected, setSelected] = useState<string[]>(myPicksThisRound);
-  const [saved, setSaved] = useState(myPicksThisRound.length === 3);
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const interval = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setIdx((i) => (i + 1) % photos.length);
+        setFading(false);
+      }, 600);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [photos.length]);
+
+  const photo = photos[idx];
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: 220, overflow: "hidden" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={photo.url}
+        alt={photo.caption}
+        style={{
+          width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%",
+          transition: "opacity 0.6s ease", opacity: fading ? 0 : 1,
+          display: "block",
+        }}
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+      {/* Dark gradient overlay — bottom to top for text legibility */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.15) 100%)",
+      }} />
+      {/* Caption */}
+      <div style={{
+        position: "absolute", bottom: 12, left: 16, right: 16,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", letterSpacing: "0.06em", fontStyle: "italic" }}>
+          {photo.caption}
+        </span>
+        {/* Dot indicators for Augusta rotation */}
+        {photos.length > 1 && (
+          <div style={{ display: "flex", gap: 5 }}>
+            {photos.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                style={{
+                  width: 6, height: 6, borderRadius: "50%", border: "none", padding: 0, cursor: "pointer",
+                  background: i === idx ? "var(--accent)" : "rgba(255,255,255,0.4)",
+                  transition: "background 0.3s",
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Champion Banner ──────────────────────────────────────────────────────────
+function ChampionBanner({ tournament }: { tournament: Tournament }) {
+  const [champion, setChampion] = useState<{ name: string; year: number } | null>(null);
+
+  useEffect(() => {
+    // First try 2026 champion (current year)
+    fetch(`/api/champion?tournament=${tournament.id}&year=2026`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.champion) setChampion({ name: d.champion, year: d.year });
+        else setChampion(tournament.priorChampion);
+      })
+      .catch(() => setChampion(tournament.priorChampion));
+  }, [tournament]);
+
+  if (!champion) return null;
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.03)", borderBottom: "1px solid var(--card-border)",
+      padding: "8px 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+    }}>
+      <span style={{ fontSize: 16 }}>🏆</span>
+      <span style={{ fontSize: 13, color: "var(--cream-dim)", letterSpacing: "0.04em" }}>
+        <span style={{ color: "var(--accent)", fontWeight: 600 }}>{champion.year} Champion </span>
+        <span style={{ color: "var(--cream)" }}>{champion.name}</span>
+      </span>
+    </div>
+  );
+}
+
+// ─── My Picks Tab ─────────────────────────────────────────────────────────────
+function MyPicksTab({
+  token, userId, tournament, allPicks, scores, odds, onPicksChanged,
+}: {
+  token: string; userId: string; tournament: Tournament;
+  allPicks: Pick[]; scores: GolferScore[]; odds: Record<string, string>;
+  onPicksChanged: () => void;
+}) {
+  const round = getCurrentRound(tournament);
+  const revealed = isRoundRevealed(tournament, round);
+  const revealDate = new Date(tournament.rounds[round as 1|2|3|4].revealTimeUTC);
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
+  const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
+
+  // My picks for this round
+  const myCurrentPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === round).map((p) => p.golfer);
+
+  // All golfers I've used in previous rounds (burned)
+  const burnedSet = new Set(
+    allPicks.filter((p) => p.user_id === userId && p.round_number < round).map((p) => p.golfer)
+  );
+
+  // Cut players (status !== 'active')
+  const cutSet = new Set(scores.filter((s) => s.status !== "active").map((s) => s.name));
 
   useEffect(() => {
-    const existing = allPicks.filter(p => p.user_id === userId && p.round_number === round).map(p => p.golfer);
-    setSelected(existing);
-    setSaved(existing.length === 3);
+    setSelected(myCurrentPicks);
+    setSaved(myCurrentPicks.length === 3);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPicks, userId, round]);
 
   useEffect(() => {
@@ -340,20 +446,20 @@ function MyPicksTab({ token, userId, allPicks, scores, onPicksChanged }: {
   }, [revealDate]);
 
   function toggle(g: string) {
-    if (revealed) return;
-    if (selected.includes(g)) { setSelected(selected.filter(x => x !== g)); setSaved(false); return; }
+    if (revealed || burnedSet.has(g) || (round >= 3 && cutSet.has(g))) return;
+    if (selected.includes(g)) { setSelected(selected.filter((x) => x !== g)); setSaved(false); return; }
     if (selected.length >= 3) return;
     setSelected([...selected, g]); setSaved(false);
   }
 
   async function submit() {
-    if (selected.length !== 3) { setError("Pick exactly 3 golfers"); return; }
+    if (selected.length !== 3) return;
     setSubmitting(true); setError(""); setSuccess("");
     try {
       const res = await fetch("/api/picks", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ round, golfers: selected }),
+        body: JSON.stringify({ tournament: tournament.id, round, golfers: selected }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -362,36 +468,53 @@ function MyPicksTab({ token, userId, allPicks, scores, onPicksChanged }: {
     finally { setSubmitting(false); }
   }
 
-  const scoreMap = Object.fromEntries(scores.map(s => [s.golfer, s]));
+  // Build sorted golfer list: available first, then burned, then cut
+  const sortedGolfers = [...scores].sort((a, b) => {
+    const aAvail = !burnedSet.has(a.name) && a.status === "active";
+    const bAvail = !burnedSet.has(b.name) && b.status === "active";
+    if (aAvail && !bAvail) return -1;
+    if (!aAvail && bAvail) return 1;
+    return a.totalScore - b.totalScore;
+  });
+
+  const scoringNote = round <= 2
+    ? "Lowest 2 of your 3 golfer scores count this round"
+    : "All 3 of your golfer scores count this round";
 
   return (
     <div>
-      <div style={S.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-          <h2 style={S.cardTitle}>{ROUND_LABELS[round]}</h2>
-          <span style={S.pill(revealed ? "dim" : "gold")}>{revealed ? "Locked" : "Open"}</span>
+      {/* Round header */}
+      <div style={{ ...card }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div>
+            <h2 style={{ fontSize: 18, color: "var(--accent)", fontFamily: "Playfair Display, serif" }}>
+              {ROUND_LABELS[round]} {revealed ? "— Locked" : "— Open"}
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--cream-dim)", marginTop: 4, fontStyle: "italic" }}>{scoringNote}</p>
+          </div>
+          {!revealed && (
+            <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--card-border)", borderRadius: 6, padding: "6px 12px", fontSize: 13, color: "var(--accent)", textAlign: "right", flexShrink: 0 }}>
+              🔒 {countdown}
+            </div>
+          )}
         </div>
 
-        {!revealed && (
-          <div style={S.countdownBadge}>
-            <span>🔒</span> Picks lock in {countdown}
-          </div>
-        )}
-
-        {/* Current picks summary */}
+        {/* Selected picks summary */}
         {selected.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 8, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              {revealed ? "Your picks" : `Your picks (${selected.length}/3)`}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
-              {selected.map(g => {
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 11, color: "var(--cream-dim)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+              {revealed ? "Your picks" : `Selected (${selected.length}/3)`}
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {selected.map((g) => {
                 const sc = scoreMap[g];
                 return (
-                  <div key={g} style={{ background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.3)", borderRadius: 20, padding: "5px 14px", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 14, color: "var(--gold)" }}>{g}</span>
-                    {revealed && sc && <span style={S.score(sc.total_score)}>{fmtScore(sc.total_score)}</span>}
-                    {!revealed && <button onClick={() => toggle(g)} style={{ background: "none", border: "none", color: "var(--cream-dim)", cursor: "pointer", padding: 0, fontSize: 14 }}>✕</button>}
+                  <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", border: "1px solid var(--accent)", borderRadius: 20, padding: "5px 12px" }}>
+                    <span style={{ fontSize: 14, color: "var(--accent)" }}>{g}</span>
+                    {sc && <span style={{ fontSize: 13, fontFamily: "monospace", color: scoreColor(sc.totalScore) }}>{fmtScore(sc.totalScore)}</span>}
+                    {!revealed && (
+                      <button onClick={() => toggle(g)} style={{ background: "none", border: "none", color: "var(--cream-dim)", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1 }}>✕</button>
+                    )}
                   </div>
                 );
               })}
@@ -399,55 +522,86 @@ function MyPicksTab({ token, userId, allPicks, scores, onPicksChanged }: {
           </div>
         )}
 
-        {error && <div style={S.errorBox}>{error}</div>}
-        {success && <div style={S.successBox}>✓ {success}</div>}
+        {error && <div style={{ background: "rgba(192,57,43,0.12)", border: "1px solid rgba(192,57,43,0.3)", borderRadius: 8, padding: "10px 14px", color: "#e07b6f", marginBottom: 12, fontSize: 14 }}>{error}</div>}
+        {success && <div style={{ background: "rgba(93,186,126,0.12)", border: "1px solid rgba(93,186,126,0.3)", borderRadius: 8, padding: "10px 14px", color: "var(--score-low)", marginBottom: 12, fontSize: 14 }}>✓ {success}</div>}
 
+        {/* Golfer list */}
         {!revealed && (
           <>
-            <div style={S.divider} />
-            <p style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 14 }}>Select 3 golfers. Lower combined score wins.</p>
-            <div style={S.golferGrid}>
-              {GOLFERS.map(g => {
-                const sel = selected.includes(g);
-                const dis = !sel && selected.length >= 3;
-                const sc = scoreMap[g];
-                return (
-                  <button key={g} onClick={() => toggle(g)} disabled={dis} style={S.golferBtn(sel, dis)}>
-                    <span style={{ fontSize: 14 }}>{g}</span>
-                    <span style={{ ...S.score(sc?.total_score ?? null), fontSize: 13 }}>{sc ? fmtScore(sc.total_score) : ""}</span>
-                  </button>
-                );
-              })}
+            <div style={{ height: 1, background: "var(--card-border)", margin: "12px 0" }} />
+            <p style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 12 }}>
+              Pick 3 golfers. Hover for season stats. Grayed = already used or cut.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {sortedGolfers.map((gs) => (
+                <GolferCard
+                  key={gs.name}
+                  name={gs.name}
+                  score={gs}
+                  selected={selected.includes(gs.name)}
+                  burned={burnedSet.has(gs.name)}
+                  cut={round >= 3 && gs.status !== "active"}
+                  disabled={!selected.includes(gs.name) && selected.length >= 3}
+                  odds={odds[gs.name] ?? ""}
+                  espnId={gs.espnId}
+                  headshot={gs.headshot}
+                  onClick={() => toggle(gs.name)}
+                />
+              ))}
             </div>
 
-            <button onClick={submit} disabled={selected.length !== 3 || submitting}
-              style={{ ...S.submitBtn, opacity: selected.length !== 3 || submitting ? 0.5 : 1 }}>
+            <button
+              onClick={submit}
+              disabled={selected.length !== 3 || submitting}
+              style={{
+                width: "100%", padding: "13px", marginTop: 16,
+                background: "var(--accent)", color: "var(--bg)",
+                border: "none", borderRadius: 8, fontSize: 16,
+                fontFamily: "Playfair Display, serif", fontWeight: 600,
+                cursor: selected.length !== 3 ? "not-allowed" : "pointer",
+                opacity: selected.length !== 3 || submitting ? 0.5 : 1,
+              }}
+            >
               {submitting ? "Saving…" : saved ? "Update Picks" : "Lock In Picks"}
             </button>
           </>
         )}
       </div>
 
-      {/* Previous rounds — your own picks */}
-      {[1, 2, 3, 4].filter(r => r < round).map(r => {
-        const myPicks = allPicks.filter(p => p.user_id === userId && p.round_number === r).map(p => p.golfer);
-        if (myPicks.length === 0) return null;
-        const roundScore = myPicks.reduce((sum, g) => sum + (scoreMap[g]?.total_score ?? 0), 0);
+      {/* Prior rounds summary */}
+      {[1, 2, 3, 4].filter((r) => r < round && isRoundRevealed(tournament, r)).map((r) => {
+        const myPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === r).map((p) => p.golfer);
+        if (!myPicks.length) return null;
+        const roundScores = myPicks.map((g) => getRoundScore(scoreMap[g], r));
+        const roundTotal = calcRoundScore(roundScores, r);
+        const usedCount = r <= 2 ? 2 : 3;
+
         return (
-          <div key={r} style={{ ...S.card, opacity: 0.85 }}>
+          <div key={r} style={{ ...card, opacity: 0.85 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-              <h3 style={{ ...S.cardTitle, fontSize: 15, marginBottom: 0 }}>{ROUND_LABELS[r]}</h3>
-              <span style={{ fontFamily: "monospace", color: roundScore < 0 ? "#5dba7e" : roundScore > 0 ? "var(--red)" : "var(--cream)", fontSize: 15 }}>{fmtScore(roundScore)}</span>
+              <h3 style={{ fontSize: 15, color: "var(--accent)", fontFamily: "Playfair Display, serif" }}>
+                {ROUND_LABELS[r]} <span style={{ fontSize: 12, color: "var(--cream-dim)", fontWeight: 400 }}>({r <= 2 ? "best 2 of 3" : "all 3"})</span>
+              </h3>
+              <span style={{ fontFamily: "monospace", fontSize: 16, color: scoreColor(roundTotal) }}>{fmtScore(roundTotal)}</span>
             </div>
-            {myPicks.map(g => {
+            {myPicks.map((g, i) => {
               const sc = scoreMap[g];
+              const rs = getRoundScore(sc, r);
+              // For R1/R2, mark the highest score as "not counted"
+              const sortedScores = [...roundScores].sort((a, b) => (a ?? 999) - (b ?? 999));
+              const notCounted = r <= 2 && roundScores.indexOf(rs) !== -1 && i === roundScores.indexOf(Math.max(...roundScores.map((s) => s ?? -999)));
               return (
-                <div key={g} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 14 }}>
-                  <span>{g}</span>
-                  <span style={S.score(sc?.total_score ?? null)}>{sc ? fmtScore(sc.total_score) : "—"}</span>
+                <div key={g} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: notCounted ? "var(--cream-dim)" : "var(--cream)", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
+                    {notCounted && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>not counted</span>}
+                  </div>
+                  <span style={{ fontFamily: "monospace", color: scoreColor(rs), opacity: notCounted ? 0.5 : 1 }}>{fmtScore(rs)}</span>
                 </div>
               );
             })}
+            {/* show unused picks count */}
+            <p style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 8, fontStyle: "italic" }}>{usedCount} of {myPicks.length} scores counted</p>
           </div>
         );
       })}
@@ -456,32 +610,41 @@ function MyPicksTab({ token, userId, allPicks, scores, onPicksChanged }: {
 }
 
 // ─── Leaderboard Tab ──────────────────────────────────────────────────────────
-function LeaderboardTab({ allPicks, scores }: { allPicks: Pick[]; scores: GolferScore[] }) {
-  const scoreMap = Object.fromEntries(scores.map(s => [s.golfer, s.total_score]));
+function LeaderboardTab({
+  tournament, allPicks, scores, playerCount,
+}: {
+  tournament: Tournament; allPicks: Pick[]; scores: GolferScore[]; playerCount: number;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
+  const purse = playerCount * 50;
 
-  // Get all unique users from visible picks
-  const userMap: Record<string, { username: string; userId: string }> = {};
-  allPicks.forEach(p => { userMap[p.user_id] = { username: p.username, userId: p.user_id }; });
+  // Build standings
+  const userMap: Record<string, string> = {};
+  allPicks.forEach((p) => { userMap[p.user_id] = p.username; });
 
-  // For each user, sum scores across all revealed rounds
-  const standings = Object.values(userMap).map(u => {
+  const standings = Object.entries(userMap).map(([uid, uname]) => {
     let total = 0;
-    let rounds = 0;
+    const roundBreakdowns: Record<number, { picks: string[]; score: number }> = {};
+
     for (let r = 1; r <= 4; r++) {
-      if (!isRevealed(r)) continue;
-      const rPicks = allPicks.filter(p => p.user_id === u.userId && p.round_number === r);
-      if (rPicks.length === 0) continue;
-      rounds++;
-      total += rPicks.reduce((sum, p) => sum + (scoreMap[p.golfer] ?? 0), 0);
+      if (!isRoundRevealed(tournament, r)) continue;
+      const rPicks = allPicks.filter((p) => p.user_id === uid && p.round_number === r).map((p) => p.golfer);
+      if (!rPicks.length) continue;
+      const roundScores = rPicks.map((g) => getRoundScore(scoreMap[g], r));
+      const roundScore = calcRoundScore(roundScores, r);
+      total += roundScore;
+      roundBreakdowns[r] = { picks: rPicks, score: roundScore };
     }
-    return { ...u, total, rounds };
+
+    return { uid, username: uname, total, rounds: roundBreakdowns };
   }).sort((a, b) => a.total - b.total);
 
-  if (standings.length === 0) {
+  if (!standings.length) {
     return (
-      <div style={S.card}>
+      <div style={card}>
         <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 24 }}>
-          Picks will appear here after the first tee time each day.
+          Standings will appear after the first tee time {isTournamentStarted(tournament) ? "today" : "Thursday"}.
         </p>
       </div>
     );
@@ -489,102 +652,163 @@ function LeaderboardTab({ allPicks, scores }: { allPicks: Pick[]; scores: Golfer
 
   return (
     <div>
-      <div style={S.card}>
-        <h2 style={S.cardTitle}>Overall Standings</h2>
-        <p style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 20, fontStyle: "italic" }}>Combined score across all revealed rounds</p>
-        {standings.map((u, i) => (
-          <div key={u.userId} style={S.lbRow(i + 1)}>
-            <div style={S.lbRank(i + 1)}>{i + 1}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, color: i === 0 ? "var(--gold)" : "var(--cream)" }}>{u.username}</div>
-              <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>{u.rounds} round{u.rounds !== 1 ? "s" : ""} counted</div>
-            </div>
-            <div style={{ fontFamily: "monospace", fontSize: 20, color: u.total < 0 ? "#5dba7e" : u.total > 0 ? "var(--red)" : "var(--cream)", fontWeight: 600 }}>
-              {fmtScore(u.total)}
-            </div>
-          </div>
-        ))}
+      {/* Purse */}
+      <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Total Purse</div>
+          <div style={{ fontSize: 28, color: "var(--accent)", fontFamily: "Playfair Display, serif" }}>${purse.toLocaleString()}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 12, color: "var(--cream-dim)", marginBottom: 4 }}>{playerCount} players × $50</div>
+          <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Lowest combined score wins</div>
+        </div>
       </div>
 
-      {/* Per-round breakdown */}
-      {[1, 2, 3, 4].filter(r => isRevealed(r)).map(r => {
-        const roundStandings = Object.values(userMap).map(u => {
-          const rPicks = allPicks.filter(p => p.user_id === u.userId && p.round_number === r);
-          const score = rPicks.reduce((sum, p) => sum + (scoreMap[p.golfer] ?? 0), 0);
-          return { ...u, score, picks: rPicks.map(p => p.golfer) };
-        }).sort((a, b) => a.score - b.score);
+      {/* Standings */}
+      {standings.map((u, i) => {
+        const isOpen = expanded === u.uid;
+        const roundsPlayed = Object.keys(u.rounds).length;
 
         return (
-          <div key={r} style={{ ...S.card, opacity: 0.9 }}>
-            <h3 style={{ ...S.cardTitle, fontSize: 15 }}>{ROUND_LABELS[r]}</h3>
-            {roundStandings.map((u, i) => (
-              <div key={u.userId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                <div>
-                  <span style={{ color: i === 0 ? "var(--gold)" : "var(--cream)", fontSize: 15 }}>{u.username}</span>
-                  <span style={{ fontSize: 12, color: "var(--cream-dim)", marginLeft: 10 }}>{u.picks.join(", ")}</span>
-                </div>
-                <span style={{ fontFamily: "monospace", fontSize: 15, color: u.score < 0 ? "#5dba7e" : u.score > 0 ? "var(--red)" : "var(--cream)" }}>{fmtScore(u.score)}</span>
+          <div key={u.uid} style={{ ...card, padding: 0, overflow: "hidden" }}>
+            {/* Main row */}
+            <button
+              onClick={() => setExpanded(isOpen ? null : u.uid)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
+                background: i === 0 ? "rgba(201,168,76,0.06)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+              }}
+            >
+              {/* Rank */}
+              <div style={{
+                width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: i === 0 ? "var(--accent)" : "rgba(255,255,255,0.08)",
+                color: i === 0 ? "var(--bg)" : "var(--cream-dim)",
+                fontSize: 13, fontWeight: 700,
+              }}>{i + 1}</div>
+
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>{u.username}</div>
+                <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 2 }}>{roundsPlayed} round{roundsPlayed !== 1 ? "s" : ""} counted</div>
               </div>
-            ))}
+
+              <div style={{ fontSize: 22, fontFamily: "monospace", color: scoreColor(u.total), fontWeight: 600 }}>{fmtScore(u.total)}</div>
+              <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>{isOpen ? "▲" : "▼"}</div>
+            </button>
+
+            {/* Expanded round breakdown */}
+            {isOpen && (
+              <div style={{ borderTop: "1px solid var(--card-border)", padding: "14px 18px 18px" }}>
+                {Object.entries(u.rounds).map(([r, rd]) => {
+                  const rNum = parseInt(r);
+                  const roundScores = rd.picks.map((g) => getRoundScore(scoreMap[g], rNum));
+
+                  return (
+                    <div key={r} style={{ marginBottom: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600 }}>
+                          {ROUND_LABELS[rNum]} {rNum <= 2 ? "(best 2)" : "(all 3)"}
+                        </span>
+                        <span style={{ fontFamily: "monospace", fontSize: 14, color: scoreColor(rd.score) }}>{fmtScore(rd.score)}</span>
+                      </div>
+                      {rd.picks.map((g, pi) => {
+                        const rs = roundScores[pi];
+                        const maxScore = Math.max(...roundScores.map((s) => s ?? -999));
+                        const notCounted = rNum <= 2 && rs === maxScore && rd.picks.length === 3;
+                        return (
+                          <div key={g} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 8px", background: "rgba(255,255,255,0.02)", borderRadius: 4, marginBottom: 3 }}>
+                            <span style={{ color: notCounted ? "var(--cream-dim)" : "var(--cream)", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
+                            <span style={{ fontFamily: "monospace", color: scoreColor(rs), opacity: notCounted ? 0.5 : 1 }}>{fmtScore(rs)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
+
+      <p style={{ textAlign: "center", fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic", marginTop: 8 }}>
+        {standings.length > 1 && standings[0].total === standings[1].total ? "⚖️ Tied — purse splits equally" : ""}
+      </p>
     </div>
   );
 }
 
 // ─── History Tab ──────────────────────────────────────────────────────────────
-function HistoryTab({ allPicks, scores }: { allPicks: Pick[]; scores: GolferScore[] }) {
-  const scoreMap = Object.fromEntries(scores.map(s => [s.golfer, s]));
+function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; allPicks: Pick[]; scores: GolferScore[] }) {
+  const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
+  const revealedRounds = [1, 2, 3, 4].filter((r) => isRoundRevealed(tournament, r));
 
-  const revealedRounds = [1, 2, 3, 4].filter(r => isRevealed(r));
-
-  if (revealedRounds.length === 0) {
+  if (!revealedRounds.length) {
     return (
-      <div style={S.card}>
+      <div style={card}>
         <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 24 }}>
-          History will appear here after the first tee time Thursday.
+          History will appear here after the first tee time.
         </p>
       </div>
     );
   }
 
-  // Group picks by round then user
   return (
     <div>
-      {revealedRounds.map(r => {
-        const rPicks = allPicks.filter(p => p.round_number === r);
-        // Group by user
+      {revealedRounds.map((r) => {
         const byUser: Record<string, { username: string; picks: string[] }> = {};
-        rPicks.forEach(p => {
+        allPicks.filter((p) => p.round_number === r).forEach((p) => {
           if (!byUser[p.user_id]) byUser[p.user_id] = { username: p.username, picks: [] };
           byUser[p.user_id].picks.push(p.golfer);
         });
 
+        const withScores = Object.values(byUser).map((u) => {
+          const roundScores = u.picks.map((g) => getRoundScore(scoreMap[g], r));
+          return { ...u, score: calcRoundScore(roundScores, r), roundScores };
+        }).sort((a, b) => a.score - b.score);
+
         return (
-          <div key={r} style={S.card}>
-            <h2 style={S.cardTitle}>{ROUND_LABELS[r]}</h2>
-            {Object.values(byUser).map(u => {
-              const userScore = u.picks.reduce((sum, g) => sum + (scoreMap[g]?.total_score ?? 0), 0);
+          <div key={r} style={card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 17, color: "var(--accent)", fontFamily: "Playfair Display, serif" }}>{ROUND_LABELS[r]}</h2>
+              <span style={{ fontSize: 12, color: "var(--cream-dim)" }}>{r <= 2 ? "Best 2 of 3 count" : "All 3 count"}</span>
+            </div>
+
+            {withScores.map((u, i) => {
+              const maxScore = Math.max(...u.roundScores.map((s) => s ?? -999));
               return (
-                <div key={u.username} style={{ marginBottom: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: 16, color: "var(--cream)" }}>{u.username}</span>
-                    <span style={{ fontFamily: "monospace", fontSize: 15, color: userScore < 0 ? "#5dba7e" : userScore > 0 ? "var(--red)" : "var(--cream)" }}>{fmtScore(userScore)}</span>
+                <div key={u.username} style={{ marginBottom: 18 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 15, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>
+                      {i === 0 && "🏅 "}{u.username}
+                    </span>
+                    <span style={{ fontFamily: "monospace", fontSize: 16, color: scoreColor(u.score) }}>{fmtScore(u.score)}</span>
                   </div>
-                  {u.picks.map(g => {
+                  {u.picks.map((g, pi) => {
+                    const rs = u.roundScores[pi];
                     const sc = scoreMap[g];
+                    const notCounted = r <= 2 && rs === maxScore && u.picks.length === 3;
                     return (
-                      <div key={g} style={{ display: "flex", justifyContent: "space-between", padding: "6px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 6, marginBottom: 4, fontSize: 14 }}>
-                        <span style={{ color: "var(--cream)" }}>{g}</span>
-                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                          {sc?.position && <span style={{ fontSize: 12, color: "var(--cream-dim)" }}>{sc.position}</span>}
-                          <span style={S.score(sc?.total_score ?? null)}>{sc ? fmtScore(sc.total_score) : "—"}</span>
+                      <div key={g} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6, marginBottom: 4, fontSize: 14 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {sc?.headshot && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={sc.headshot} alt={g} width={24} height={24} style={{ borderRadius: "50%", objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                          )}
+                          <span style={{ color: notCounted ? "var(--cream-dim)" : "var(--cream)", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
+                          {notCounted && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>not counted</span>}
+                          {sc?.status !== "active" && <span style={{ fontSize: 10, color: "#e07b6f", background: "rgba(192,57,43,0.15)", padding: "1px 6px", borderRadius: 10 }}>{sc?.status?.toUpperCase()}</span>}
+                        </div>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          {sc?.position && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{sc.position}</span>}
+                          <span style={{ fontFamily: "monospace", color: scoreColor(rs), opacity: notCounted ? 0.5 : 1 }}>{fmtScore(rs)}</span>
                         </div>
                       </div>
                     );
                   })}
-                  <div style={S.divider} />
+                  {i < withScores.length - 1 && <div style={{ height: 1, background: "var(--card-border)", marginTop: 12 }} />}
                 </div>
               );
             })}
@@ -597,15 +821,18 @@ function HistoryTab({ allPicks, scores }: { allPicks: Pick[]; scores: GolferScor
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function Page() {
+  const [hydrated, setHydrated] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("picks");
   const [picks, setPicks] = useState<Pick[]>([]);
   const [scores, setScores] = useState<GolferScore[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [odds, setOdds] = useState<Record<string, string>>({});
+  const [playerCount, setPlayerCount] = useState(0);
+  const tournament = getActiveTournament();
+  const th = tournament.theme;
 
-  // Restore session from localStorage
   useEffect(() => {
     const t = localStorage.getItem("mp_token");
     const u = localStorage.getItem("mp_username");
@@ -615,27 +842,27 @@ export default function Page() {
   }, []);
 
   const fetchData = useCallback(async (t: string) => {
-    const [picksRes, scoresRes] = await Promise.all([
-      fetch("/api/picks", { headers: { Authorization: `Bearer ${t}` } }),
-      fetch("/api/scores"),
+    const tid = tournament.id;
+    const [picksRes, scoresRes, oddsRes, playersRes] = await Promise.all([
+      fetch(`/api/picks?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` } }),
+      fetch(`/api/scores?tournament=${tid}`),
+      fetch(`/api/odds?tournament=${tid}`),
+      fetch("/api/players", { headers: { Authorization: `Bearer ${t}` } }),
     ]);
-    if (picksRes.ok) { const d = await picksRes.json(); setPicks(d.picks); }
-    if (scoresRes.ok) { const d = await scoresRes.json(); setScores(d.scores); }
-  }, []);
+    if (picksRes.ok) setPicks((await picksRes.json()).picks ?? []);
+    if (scoresRes.ok) setScores((await scoresRes.json()).scores ?? []);
+    if (oddsRes.ok) setOdds((await oddsRes.json()).odds ?? {});
+    if (playersRes.ok) setPlayerCount((await playersRes.json()).count ?? 0);
+  }, [tournament.id]);
 
-  useEffect(() => {
-    if (token) fetchData(token);
-  }, [token, fetchData]);
-
-  // Refresh data every 2 minutes
+  useEffect(() => { if (token) fetchData(token); }, [token, fetchData]);
   useEffect(() => {
     if (!token) return;
-    const t = setInterval(() => fetchData(token), 120_000);
-    return () => clearInterval(t);
+    const interval = setInterval(() => fetchData(token), 2 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [token, fetchData]);
 
   function handleLogin(t: string, u: string) {
-    // Decode userId from JWT payload (middle segment)
     const payload = JSON.parse(atob(t.split(".")[1]));
     localStorage.setItem("mp_token", t);
     localStorage.setItem("mp_username", u);
@@ -644,46 +871,62 @@ export default function Page() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("mp_token");
-    localStorage.removeItem("mp_username");
-    localStorage.removeItem("mp_userId");
+    ["mp_token", "mp_username", "mp_userId"].forEach((k) => localStorage.removeItem(k));
     setToken(null); setUsername(null); setUserId(null);
     setPicks([]); setScores([]);
   }
 
   if (!hydrated) return null;
-  if (!token || !username || !userId) return <LoginScreen onLogin={handleLogin} />;
+  if (!token || !username || !userId) return <AuthScreen tournament={tournament} onLogin={handleLogin} />;
 
   return (
-    <div style={S.page}>
-      <header style={S.header}>
-        <div style={S.logo}>
-          <h1 style={S.logoTitle}>Major Pick&apos;em</h1>
-          <span style={S.logoSub}>Masters 2026 · Augusta National</span>
+    <div style={{ minHeight: "100vh", background: th.bg, color: th.cream, fontFamily: "EB Garamond, serif", paddingBottom: 80, ...themeVars(tournament) }}>
+      {/* Header */}
+      <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 20 }}>{th.emoji}</span>
+            <h1 style={{ fontSize: 20, color: th.accent, fontFamily: "Playfair Display, serif", lineHeight: 1 }}>Major Pick&apos;em</h1>
+          </div>
+          <div style={{ fontSize: 11, color: th.creamDim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>{tournament.shortName} · {tournament.location}</div>
         </div>
-        <div style={S.userInfo}>
-          <span style={S.userName}>{username}</span>
-          <button onClick={handleLogout} style={S.logoutBtn}>Sign out</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 14, color: th.creamDim, fontStyle: "italic" }}>{username}</span>
+          <button onClick={handleLogout} style={{ background: "transparent", border: `1px solid ${th.cardBorder}`, color: th.creamDim, padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
+            Sign out
+          </button>
         </div>
-      </header>
+      </div>
 
-      <nav style={S.tabs}>
-        {(["picks", "leaderboard", "history"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={S.tab(tab === t)}>
+      {/* Champion banner */}
+      <CourseHero tournament={tournament} />
+      <ChampionBanner tournament={tournament} />
+
+      {/* Tab nav */}
+      <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "0 24px", display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
+        {(["picks", "leaderboard", "history"] as Tab[]).map((t) => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: "13px 22px", fontSize: 15, background: "transparent", border: "none",
+            borderBottom: tab === t ? `2px solid ${th.accent}` : "2px solid transparent",
+            color: tab === t ? th.accent : th.creamDim,
+            cursor: "pointer", fontFamily: "Playfair Display, serif",
+            fontWeight: tab === t ? 600 : 400, transition: "all 0.2s",
+          }}>
             {t === "picks" ? "My Picks" : t === "leaderboard" ? "Leaderboard" : "History"}
           </button>
         ))}
-      </nav>
+      </div>
 
-      <main style={S.content}>
-        {tab === "picks" && (
-          <MyPicksTab token={token} userId={userId} allPicks={picks} scores={scores} onPicksChanged={() => fetchData(token)} />
+      {/* Content */}
+      <main style={{ maxWidth: 700, margin: "0 auto", padding: "28px 20px" }}>
+        {tab === "picks" && token && userId && (
+          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab allPicks={picks} scores={scores} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} />
         )}
         {tab === "history" && (
-          <HistoryTab allPicks={picks} scores={scores} />
+          <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />
         )}
       </main>
     </div>

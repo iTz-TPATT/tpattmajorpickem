@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Major Pick'em 2026",
-  description: "Masters Tournament pick'em for the boys",
+  description: "Four majors. One champion.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
