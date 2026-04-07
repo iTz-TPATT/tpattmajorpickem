@@ -614,7 +614,7 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
 
   return (
     <div style={{
-      position: "relative", width: "100%", height: 240,
+      position: "relative", width: "100%", height: 260,
       overflow: "hidden",
       background: "linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-dark) 40%, var(--bg-mid) 100%)",
     }}>
@@ -638,7 +638,7 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
           style={{
             position: "absolute", inset: 0,
             width: "100%", height: "100%",
-            objectFit: "cover", objectPosition: "center center",
+            objectFit: "contain", objectPosition: "center center", background: "#0a2a1a",
             transition: `opacity ${FADE_MS}ms ease`,
             opacity,
           }}
