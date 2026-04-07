@@ -27,7 +27,8 @@ interface Overrides {
   useManualScores?: boolean;
 }
 
-const S: Record<string, React.CSSProperties | ((arg: boolean) => React.CSSProperties)> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const S: Record<string, any> = {
   page: { minHeight: "100vh", background: "#0a0a0a", color: "#e0e0e0", fontFamily: "monospace", padding: 0 },
   header: { background: "#111", borderBottom: "1px solid #333", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
   title: { fontSize: 18, color: "#f0c040", fontFamily: "monospace", fontWeight: 700 },
