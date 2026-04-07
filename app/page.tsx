@@ -610,7 +610,7 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
 
       {/* Tournament title */}
       <div style={{ position: "absolute", top: 20, left: 20, display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ display: "inline-flex", alignItems: "center" }}>{tournament.id === "masters" ? <TexasIcon size={28} color={th.accent} /> : <span style={{ fontSize: 28 }}>{tournament.theme.emoji}</span>}</span>
+        <span style={{ display: "inline-flex", alignItems: "center" }}>{tournament.id === "masters" ? <TexasIcon size={28} color={tournament.theme.accent} /> : <span style={{ fontSize: 28 }}>{tournament.theme.emoji}</span>}</span>
         <div>
           <div style={{ fontSize: 15, color: "var(--accent)", fontFamily: "Playfair Display, serif", fontWeight: 600, lineHeight: 1.2 }}>
             {tournament.shortName} {tournament.year}
