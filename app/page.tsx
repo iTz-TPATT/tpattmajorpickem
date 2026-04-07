@@ -1406,19 +1406,22 @@ export default function Page() {
   }, [token, fetchData]);
     // === immediate refresh when admin updates scores/overrides/proxy picks ===
   useEffect(() => {
-    if (!token) return;
+  if (!token) return;
 
-    // Handler for storage events fired from other tabs/windows (when admin writes the refresh key)
-    function onStorage(e: StorageEvent) {
-      if (e.key === "mp_data_refresh") {
-        // Optionally check e.newValue or parse timestamp; always refetch
-        fetchData(token).catch(() => { /* swallow */ });
+  function onStorage(e: StorageEvent) {
+    if (e.key === "mp_data_refresh") {
+      // Ensure token is non-null at call time (TypeScript-safe)
+      if (token) {
+        fetchData(token).catch(() => {
+          /* swallow errors from background refetch */
+        });
       }
     }
+  }
 
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [token, fetchData]);
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}, [token, fetchData]);
 
   function handleLogin(t: string, u: string) {
     const payload = JSON.parse(atob(t.split(".")[1]));
