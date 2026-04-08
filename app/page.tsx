@@ -1418,6 +1418,205 @@ const TOURNAMENT_DAYS: Record<string, { round: string; title: string; subtitle: 
   "2026-04-12": { round: "Round 4", title: "Green Jacket Sunday",    subtitle: "A green jacket is on the line. Best day in golf.",    emoji: "🏆" },
 };
 
+// ─── Masters Splash Screen ────────────────────────────────────────────────────
+function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: string }) {
+  const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Try to play Masters theme from a CDN-hosted source
+    try {
+      const audio = new Audio("https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg");
+      audio.volume = 0.35;
+      audio.play().catch(() => {}); // silently fail if autoplay blocked
+      audioRef.current = audio;
+    } catch {}
+
+    const t1 = setTimeout(() => setPhase("hold"), 600);
+    const t2 = setTimeout(() => setPhase("out"), 3600);
+    const t3 = setTimeout(() => {
+      onDone();
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    }, 4400);
+    return () => {
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    };
+  }, [onDone]);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 99999,
+      display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center",
+      background: "#071510",
+      opacity: phase === "in" ? 0 : phase === "hold" ? 1 : 0,
+      transition: phase === "in" ? "opacity 600ms ease" : "opacity 800ms ease",
+      overflow: "hidden",
+    }}>
+      {/* Background image */}
+      {bgImage && (
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundImage: `url(${bgImage})`,
+          backgroundSize: "cover", backgroundPosition: "right center",
+          opacity: 0.18, filter: "blur(1px)",
+        }} />
+      )}
+      {/* Green gradient overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(135deg, rgba(7,21,16,0.92) 0%, rgba(15,35,24,0.85) 50%, rgba(7,21,16,0.92) 100%)",
+      }} />
+      {/* Content */}
+      <div style={{ position: "relative", textAlign: "center" as const, padding: "0 32px", maxWidth: 500 }}>
+        {/* Azalea icon */}
+        <div style={{ fontSize: 48, marginBottom: 24, filter: "drop-shadow(0 0 20px rgba(201,168,76,0.4))" }}>🌿</div>
+        {/* Augusta tagline */}
+        <div style={{
+          fontFamily: "Playfair Display, EB Garamond, serif",
+          fontSize: 28, fontWeight: 400, letterSpacing: "0.04em",
+          color: "#c9a84c", lineHeight: 1.3, marginBottom: 8,
+          textShadow: "0 2px 20px rgba(201,168,76,0.3)",
+        }}>
+          A Tradition Unlike Any Other
+        </div>
+        {/* Tournament name */}
+        <div style={{
+          fontFamily: "EB Garamond, serif", fontSize: 15,
+          color: "rgba(240,233,214,0.7)", letterSpacing: "0.18em",
+          textTransform: "uppercase" as const, marginBottom: 40,
+        }}>
+          The Masters Tournament · 2026
+        </div>
+        {/* Divider */}
+        <div style={{ width: 60, height: 1, background: "rgba(201,168,76,0.4)", margin: "0 auto 32px" }} />
+        {/* Sponsor */}
+        <div style={{
+          fontFamily: "EB Garamond, serif", fontSize: 12,
+          color: "rgba(255,255,255,0.35)", letterSpacing: "0.14em",
+          textTransform: "uppercase" as const, marginBottom: 6,
+        }}>
+          Proudly brought to you by
+        </div>
+        <div style={{
+          fontFamily: "Playfair Display, EB Garamond, serif",
+          fontSize: 20, fontWeight: 600, color: "rgba(240,233,214,0.9)",
+          letterSpacing: "0.06em",
+        }}>
+          Patterson Inc.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Round Leader Banner ──────────────────────────────────────────────────────
+function RoundLeaderBanner({ picks, scores, registeredUsers }: {
+  picks: Pick[]; scores: GolferScore[]; registeredUsers: { id: string; username: string }[];
+}) {
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [leaderInfo, setLeaderInfo] = useState<{ username: string; total: number; round: number } | null>(null);
+
+  useEffect(() => {
+    if (!picks.length || !scores.length) return;
+
+    const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
+    const userMap: Record<string, string> = {};
+    registeredUsers.forEach((u) => { userMap[u.id] = u.username; });
+    picks.forEach((p) => { userMap[p.user_id] = p.username; });
+
+    // Find the latest completed round (all 3 picks have a score for that round)
+    let latestCompletedRound = 0;
+    for (let r = 4; r >= 1; r--) {
+      const usersWithPicksThisRound = Object.keys(userMap).filter(uid =>
+        picks.filter(p => p.user_id === uid && p.round_number === r).length === 3
+      );
+      if (usersWithPicksThisRound.length === 0) continue;
+      const allHaveScores = usersWithPicksThisRound.every(uid => {
+        const rPicks = picks.filter(p => p.user_id === uid && p.round_number === r).map(p => p.golfer);
+        return rPicks.every(g => {
+          const sc = scoreMap[g];
+          if (!sc) return false;
+          const val = [null, sc.r1, sc.r2, sc.r3, sc.r4][r];
+          return val !== null;
+        });
+      });
+      if (allHaveScores) { latestCompletedRound = r; break; }
+    }
+
+    if (!latestCompletedRound) return;
+
+    // Check if we already showed this banner this session
+    const shownKey = `mp_leader_banner_r${latestCompletedRound}`;
+    if (sessionStorage.getItem(shownKey)) return;
+
+    // Calculate standings
+    const standings = Object.entries(userMap).map(([uid, uname]) => {
+      let total = 0;
+      for (let r = 1; r <= latestCompletedRound; r++) {
+        const rPicks = picks.filter(p => p.user_id === uid && p.round_number === r).map(p => p.golfer);
+        if (!rPicks.length) continue;
+        const roundScores = rPicks.map(g => {
+          const sc = scoreMap[g];
+          if (!sc) return null;
+          return [null, sc.r1, sc.r2, sc.r3, sc.r4][r] ?? null;
+        });
+        const valid = roundScores.filter((s): s is number => s !== null);
+        if (valid.length === 0) continue;
+        const score = r <= 2
+          ? [...valid].sort((a, b) => a - b).slice(0, 2).reduce((s, v) => s + v, 0)
+          : valid.reduce((s, v) => s + v, 0);
+        total += score;
+      }
+      return { uid, username: uname, total };
+    }).sort((a, b) => a.total - b.total);
+
+    if (!standings.length) return;
+    const leader = standings[0];
+
+    sessionStorage.setItem(shownKey, "1");
+    setLeaderInfo({ username: leader.username, total: leader.total, round: latestCompletedRound });
+
+    const t1 = setTimeout(() => { setMounted(true); setVisible(true); }, 1200);
+    const t2 = setTimeout(() => setVisible(false), 7000);
+    const t3 = setTimeout(() => setMounted(false), 7800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [picks, scores, registeredUsers]);
+
+  if (!mounted || !leaderInfo) return null;
+
+  const scoreStr = leaderInfo.total === 0 ? "E" : leaderInfo.total > 0 ? `+${leaderInfo.total}` : `${leaderInfo.total}`;
+
+  return (
+    <div style={{
+      position: "fixed", bottom: 90, left: "50%",
+      transform: visible ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(120px)",
+      opacity: visible ? 1 : 0,
+      transition: "transform 500ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease",
+      zIndex: 9998, pointerEvents: "none",
+    }}>
+      <div style={{
+        background: "linear-gradient(135deg, #0b3d2e 0%, #155734 100%)",
+        border: "1px solid rgba(201,168,76,0.5)",
+        borderRadius: 14, padding: "12px 20px",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", gap: 12, minWidth: 260,
+      }}>
+        <div style={{ fontSize: 24 }}>🏆</div>
+        <div>
+          <div style={{ fontSize: 10, color: "rgba(201,168,76,0.8)", letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: 2 }}>
+            Leader through Round {leaderInfo.round}
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#f0e9d6", fontFamily: "Playfair Display, serif" }}>
+            {leaderInfo.username} <span style={{ color: "#5dba7e", fontSize: 15 }}>{scoreStr}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TournamentDayBanner() {
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -1527,6 +1726,8 @@ export default function Page() {
   const [adminOverrides, setAdminOverrides] = useState<{roundOverride?: number; revealAll?: boolean}>({});
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
+  const [showSplash, setShowSplash] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   const tournament = getActiveTournament();
   const th = tournament.theme;
 
@@ -1572,6 +1773,7 @@ export default function Page() {
     localStorage.setItem("mp_username", u);
     localStorage.setItem("mp_userId", payload.userId);
     setToken(t); setUsername(u); setUserId(payload.userId);
+    setShowSplash(true);
   }
 
   function handleLogout() {
@@ -1585,6 +1787,10 @@ export default function Page() {
 
   return (
     <div style={{ minHeight: "100vh", background: th.bg, color: th.cream, fontFamily: "EB Garamond, serif", paddingBottom: 80, ...themeVars(tournament) }}>
+      {showSplash && !splashDone && (
+        <MastersSplash onDone={() => { setSplashDone(true); setShowSplash(false); }} bgImage="/splash-bg.jpg" />
+      )}
+      <RoundLeaderBanner picks={picks} scores={scores} registeredUsers={registeredUsers} />
       <TournamentDayBanner />
       {/* Header */}
       <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
