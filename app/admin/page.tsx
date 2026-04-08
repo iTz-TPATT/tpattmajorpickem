@@ -147,6 +147,9 @@ export default function AdminPage() {
   const [statsDebug, setStatsDebug] = useState<string>("");
   const [photoDebug, setPhotoDebug] = useState<string>("");
   const [proxyMsgType, setProxyMsgType] = useState<"ok"|"err">("ok");
+  const [simRound, setSimRound] = useState(1);
+  const [simLog, setSimLog] = useState<string[]>([]);
+  const [simRunning, setSimRunning] = useState(false);
 
   const showMsg = (m: string, t: "ok" | "err" = "ok") => {
     setMsg(m); setMsgType(t);
