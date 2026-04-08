@@ -1521,16 +1521,18 @@ export default function Page() {
 
   const fetchData = useCallback(async (t: string) => {
     const tid = tournament.id;
-    const [picksRes, scoresRes, oddsRes, playersRes] = await Promise.all([
+    const [picksRes, scoresRes, oddsRes, playersRes, usersRes] = await Promise.all([
       fetch(`/api/picks?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` } }),
       fetch(`/api/scores?tournament=${tid}`),
       fetch(`/api/odds?tournament=${tid}`),
       fetch("/api/players", { headers: { Authorization: `Bearer ${t}` } }),
+      fetch("/api/users", { headers: { Authorization: `Bearer ${t}` } }),
     ]);
     if (picksRes.ok) setPicks((await picksRes.json()).picks ?? []);
     if (scoresRes.ok) setScores((await scoresRes.json()).scores ?? []);
     if (oddsRes.ok) setOdds((await oddsRes.json()).odds ?? {});
     if (playersRes.ok) setPlayerCount((await playersRes.json()).count ?? 0);
+    if (usersRes.ok) setRegisteredUsers((await usersRes.json()).users ?? []);
   }, [tournament.id]);
 
   useEffect(() => { if (token) fetchData(token); }, [token, fetchData]);

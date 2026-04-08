@@ -325,7 +325,23 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json", "x-admin-password": password },
       body: JSON.stringify({ action: "save_scores", scores: withTotals }),
     });
-    log.push(`✓ Scores auto-saved for R${round}`);
+    log.push(`✓ Scores saved for R${round} (${withTotals.length} players)`);
+
+    // Ensure manual score mode + reveal + skip deadline are all ON
+    const newOverrides = {
+      ...overrides,
+      useManualScores: true,
+      revealAll: true,
+      skipDeadline: true,
+      roundOverride: round,
+    };
+    await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ action: "save_overrides", overrides: newOverrides }),
+    });
+    setOverrides(newOverrides);
+    log.push(`✓ Overrides set: R${round} override, manual scores ON, reveal all ON`);
 
     setSimLog(log);
     setSimRunning(false);
