@@ -11,23 +11,31 @@ export async function GET(request: Request) {
 
   const supabase = createServerSupabase();
 
-  // Return current overrides + all golfer scores from cache
-  const { data: overrides } = await supabase
+  // Return current overrides
+  const { data: overridesRow } = await supabase
     .from("score_cache")
     .select("data")
     .eq("tournament", "admin_overrides")
     .single();
 
-  const { data: scoreCache } = await supabase
+  const overrides = (overridesRow?.data ?? {}) as Record<string, unknown>;
+
+  // Prefer manual scores if they exist, fall back to ESPN cache
+  const { data: manualCache } = await supabase
+    .from("score_cache")
+    .select("data")
+    .eq("tournament", "manual_scores_masters")
+    .single();
+
+  const { data: espnCache } = await supabase
     .from("score_cache")
     .select("data")
     .eq("tournament", "scores_masters")
     .single();
 
-  return NextResponse.json({
-    overrides: overrides?.data ?? {},
-    scores: scoreCache?.data ?? [],
-  });
+  const scores = manualCache?.data ?? espnCache?.data ?? [];
+
+  return NextResponse.json({ overrides, scores });
 }
 
 export async function POST(request: Request) {
