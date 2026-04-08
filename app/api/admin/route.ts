@@ -47,22 +47,24 @@ export async function POST(request: Request) {
 
   // ── Save overrides (round override, reveal override) ──
   if (action === "save_overrides") {
-    await supabase.from("score_cache").upsert({
+    const { error } = await supabase.from("score_cache").upsert({
       tournament: "admin_overrides",
       data: body.overrides,
       updated_at: new Date().toISOString(),
     });
+    if (error) return NextResponse.json({ error: `DB write failed: ${error.message} (code: ${error.code})` }, { status: 500 });
     return NextResponse.json({ success: true });
   }
 
   // ── Save manual scores ──
   if (action === "save_scores") {
     const scores = body.scores as unknown[];
-    await supabase.from("score_cache").upsert({
+    const { error } = await supabase.from("score_cache").upsert({
       tournament: "manual_scores_masters",
       data: scores,
       updated_at: new Date().toISOString(),
     });
+    if (error) return NextResponse.json({ error: `DB write failed: ${error.message} (code: ${error.code})` }, { status: 500 });
     return NextResponse.json({ success: true });
   }
 

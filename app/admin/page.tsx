@@ -196,8 +196,9 @@ export default function AdminPage() {
 
   async function saveOverrides(next: Overrides) {
     setOverrides(next);
-    await call("save_overrides", { overrides: next });
-    showMsg("Overrides saved");
+    const ok = await call("save_overrides", { overrides: next });
+    if (ok) showMsg("Overrides saved");
+    // if not ok, call() already showed the error message
   }
 
   async function saveScores() {
