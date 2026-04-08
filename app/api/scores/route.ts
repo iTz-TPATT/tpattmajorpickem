@@ -77,19 +77,21 @@ export async function GET(request: Request) {
 
   const adminOverrides = (adminCache?.data ?? {}) as Record<string, unknown>;
 
-  // If admin has set manual scores, use those
+  // If admin has set manual scores, ONLY return manual scores — never ESPN
   if (adminOverrides.useManualScores) {
     const { data: manualScores } = await supabase
       .from("score_cache")
       .select("data")
       .eq("tournament", `manual_scores_${tournament}`)
       .single();
-    if (manualScores?.data) {
-      return NextResponse.json({ scores: manualScores.data, source: "manual" });
-    }
+    // Return manual scores if saved, or empty array — never fall through to ESPN
+    return NextResponse.json({
+      scores: manualScores?.data ?? [],
+      source: manualScores?.data ? "manual" : "manual_empty"
+    });
   }
 
-  // Check ESPN cache
+  // Check ESPN cache (only reached when manual mode is OFF)
   const { data: cached } = await supabase
     .from("score_cache")
     .select("data, updated_at")

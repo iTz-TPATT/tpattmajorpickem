@@ -234,6 +234,120 @@ export default function AdminPage() {
     setProxyPicks([...proxyPicks, g]);
   }
 
+  // ── Tournament Simulator ──────────────────────────────────────────────────
+  async function simulateRound(round: number) {
+    if (!users.length) { setSimLog(["No users found — make sure players have registered"]); return; }
+    setSimRunning(true);
+    const log: string[] = [];
+
+    // Build burned golfers per user from prior rounds
+    const burnable: Record<string, Set<string>> = {};
+    for (const u of users) { burnable[u.id] = new Set(); }
+
+    // Collect already-used golfers from existing picks (rounds < this one)
+    try {
+      // We'll just track what we submit in this session
+      for (let r = 1; r < round; r++) {
+        // We can't easily fetch per-user prior picks here, so just proceed
+        // The API will block burned picks — we'll shuffle and retry
+      }
+    } catch {/* ok */}
+
+    const golferPool = [...ADMIN_GOLFERS];
+
+    for (const u of users) {
+      const burned = burnable[u.id];
+      // Pick 3 random golfers not in burned set
+      const available = golferPool.filter(g => !burned.has(g));
+      if (available.length < 3) {
+        log.push(`⚠ ${u.username}: not enough available golfers (${available.length} left)`);
+        continue;
+      }
+      // Shuffle and take first 3
+      const shuffled = [...available].sort(() => Math.random() - 0.5);
+      const picks = shuffled.slice(0, 3);
+
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-password": password },
+          body: JSON.stringify({
+            action: "submit_picks_as_user",
+            userId: u.id, username: u.username,
+            tournament: selectedTournament, round,
+            golfers: picks,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          log.push(`✓ ${u.username} R${round}: ${picks.join(", ")}`);
+          picks.forEach(g => burnable[u.id].add(g));
+        } else {
+          // If burned conflict, try different picks
+          const alt = available.filter(g => !picks.includes(g)).sort(() => Math.random() - 0.5).slice(0, 3);
+          if (alt.length === 3) {
+            const res2 = await fetch("/api/admin", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-admin-password": password },
+              body: JSON.stringify({ action: "submit_picks_as_user", userId: u.id, username: u.username, tournament: selectedTournament, round, golfers: alt }),
+            });
+            if (res2.ok) {
+              log.push(`✓ ${u.username} R${round}: ${alt.join(", ")} (retry)`);
+            } else {
+              log.push(`✗ ${u.username}: ${data.error ?? "Error"}`);
+            }
+          } else {
+            log.push(`✗ ${u.username}: ${data.error ?? "Error"}`);
+          }
+        }
+      } catch (e) {
+        log.push(`✗ ${u.username}: network error`);
+      }
+    }
+
+    // Auto-generate scores for this round
+    const updatedScores = scores.map(s => {
+      const roundKey = `r${round}` as "r1"|"r2"|"r3"|"r4";
+      return { ...s, [roundKey]: Math.floor(Math.random() * 11) - 7 };
+    });
+    setScores(updatedScores);
+
+    // Auto-save scores
+    const withTotals = updatedScores.map(s => ({
+      ...s,
+      totalScore: (s.r1 ?? 0) + (s.r2 ?? 0) + (s.r3 ?? 0) + (s.r4 ?? 0),
+    }));
+    await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ action: "save_scores", scores: withTotals }),
+    });
+    log.push(`✓ Scores auto-saved for R${round}`);
+
+    setSimLog(log);
+    setSimRunning(false);
+    showMsg(`R${round} simulation complete — ${users.length} players, scores saved`);
+  }
+
+  async function wipeAndReset() {
+    if (!confirm("Wipe ALL picks and scores for this tournament? Cannot be undone.")) return;
+    setSaving(true);
+    await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ action: "wipe_picks", tournament: selectedTournament }),
+    });
+    // Clear manual scores
+    await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ action: "save_scores", scores: [] }),
+    });
+    setSimLog(["✓ All picks and scores wiped — ready for fresh test"]);
+    setSaving(false);
+    showMsg("Wiped clean — ready to simulate from R1");
+  }
+
   async function submitProxyPicks() {
     if (!proxyUser || proxyPicks.length !== 3) { setProxyMsg("Select a player and exactly 3 golfers"); setProxyMsgType("err"); return; }
     const user = users.find(u => u.id === proxyUser);
@@ -400,6 +514,46 @@ export default function AdminPage() {
           <button onClick={saveScores} disabled={saving} style={{ ...S.btn("green"), marginTop: 16, padding: "10px 24px", fontSize: 14, opacity: saving ? 0.6 : 1 }}>
             {saving ? "Saving…" : "💾 Save Scores"}
           </button>
+        </div>
+
+        {/* ── Tournament Simulator ── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>🎮 Tournament Simulator</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
+            Simulate a full tournament round: auto-submits random picks for ALL registered users,
+            generates scores, and saves everything. Run rounds in order (R1 → R2 → R3 → R4).
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const, marginBottom: 16, alignItems: "center" }}>
+            <select value={simRound} onChange={e => setSimRound(parseInt(e.target.value))} style={{ ...S.select, width: 140 }}>
+              <option value={1}>Round 1</option>
+              <option value={2}>Round 2</option>
+              <option value={3}>Round 3</option>
+              <option value={4}>Round 4</option>
+            </select>
+            <button onClick={() => simulateRound(simRound)} disabled={simRunning || !users.length}
+              style={{ ...S.btn("green"), opacity: simRunning || !users.length ? 0.5 : 1 }}>
+              {simRunning ? "⏳ Running..." : `▶ Simulate R${simRound} for All ${users.length} Players`}
+            </button>
+            <button onClick={wipeAndReset} disabled={saving}
+              style={{ ...S.btn("red"), opacity: saving ? 0.5 : 1 }}>
+              🗑 Wipe & Reset
+            </button>
+          </div>
+
+          <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
+            💡 Tip: Run rounds in order. After each round, check the main app leaderboard. Toggle round override to see each state.
+          </div>
+
+          {simLog.length > 0 && (
+            <div style={{ background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: 12, maxHeight: 220, overflowY: "auto" as const }}>
+              {simLog.map((line, i) => (
+                <div key={i} style={{ fontSize: 12, fontFamily: "monospace", color: line.startsWith("✓") ? "#5dba7e" : line.startsWith("✗") ? "#e07b6f" : "#f0c040", marginBottom: 3 }}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Submit Picks As User ── */}

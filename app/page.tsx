@@ -929,17 +929,30 @@ function MyPicksTab({
 
 // ─── Leaderboard Tab ──────────────────────────────────────────────────────────
 function LeaderboardTab({
-  tournament, allPicks, scores, playerCount,
+  tournament, allPicks, scores, playerCount, registeredUsers, currentRound,
 }: {
-  tournament: Tournament; allPicks: Pick[]; scores: GolferScore[]; playerCount: number;
+  tournament: Tournament; allPicks: Pick[]; scores: GolferScore[];
+  playerCount: number; registeredUsers: {id: string; username: string}[];
+  currentRound: number;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
   const purse = playerCount * 50;
 
-  // Build standings
+  // Build userMap from BOTH picks AND registered users
   const userMap: Record<string, string> = {};
+  registeredUsers.forEach((u) => { userMap[u.id] = u.username; });
   allPicks.forEach((p) => { userMap[p.user_id] = p.username; });
+
+  // Which users have submitted picks for the NEXT round (not yet locked)
+  const nextRound = currentRound + 1;
+  const submittedNextRound = new Set(
+    allPicks.filter(p => p.round_number === nextRound).map(p => p.user_id)
+  );
+  // Which users have submitted picks for the CURRENT round
+  const submittedCurrentRound = new Set(
+    allPicks.filter(p => p.round_number === currentRound).map(p => p.user_id)
+  );
 
   const standings = Object.entries(userMap).map(([uid, uname]) => {
     let total = 0;
@@ -961,8 +974,11 @@ function LeaderboardTab({
   if (!standings.length) {
     return (
       <div style={card}>
-        <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 24 }}>
-          Standings will appear after the first tee time {isTournamentStarted(tournament) ? "today" : "Thursday"}.
+        <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 16 }}>
+          Standings will appear once picks are submitted and revealed.
+        </p>
+        <p style={{ color: "var(--cream-dim)", fontSize: 12, textAlign: "center", padding: "0 16px 16px" }}>
+          If you&apos;re testing: go to Admin → 🧪 Enable Full Test Mode, have all users submit picks, then Fill &amp; Save manual scores.
         </p>
       </div>
     );
@@ -1069,13 +1085,34 @@ function LeaderboardTab({
 
                 {/* Name */}
                 <div style={{ paddingLeft: 8 }}>
-                  <div style={{
-                    fontSize: 15, fontWeight: isLeader ? 600 : 400,
-                    color: isLeader ? "#c9a84c" : "#e8dcc8",
-                    fontFamily: "Playfair Display, serif",
-                    whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis",
-                  }}>{u.username}</div>
-                  {/* Round pills on mobile */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{
+                      fontSize: 15, fontWeight: isLeader ? 600 : 400,
+                      color: isLeader ? "#c9a84c" : "#e8dcc8",
+                      fontFamily: "Playfair Display, serif",
+                      whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis",
+                    }}>{u.username}</div>
+                    {/* Next round pick submitted badge */}
+                    {nextRound <= 4 && submittedNextRound.has(u.uid) && (
+                      <span title={`R${nextRound} picks submitted`} style={{
+                        fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                        background: "rgba(93,186,126,0.18)",
+                        border: "1px solid rgba(93,186,126,0.35)",
+                        color: "#5dba7e", letterSpacing: "0.06em", fontFamily: "monospace",
+                        flexShrink: 0,
+                      }}>R{nextRound} ✓</span>
+                    )}
+                    {/* Current round not submitted warning */}
+                    {!submittedCurrentRound.has(u.uid) && currentRound <= 4 && (
+                      <span title={`R${currentRound} picks not submitted`} style={{
+                        fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                        background: "rgba(192,57,43,0.15)",
+                        border: "1px solid rgba(192,57,43,0.3)",
+                        color: "#c0392b", letterSpacing: "0.06em", fontFamily: "monospace",
+                        flexShrink: 0,
+                      }}>NO PICK</span>
+                    )}
+                  </div>
                   {isOpen && (
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>tap to collapse</div>
                   )}
@@ -1468,6 +1505,7 @@ export default function Page() {
   const [tab, setTab] = useState<Tab>("picks");
   const [picks, setPicks] = useState<Pick[]>([]);
   const [scores, setScores] = useState<GolferScore[]>([]);
+  const [registeredUsers, setRegisteredUsers] = useState<{id: string; username: string}[]>([]);
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const tournament = getActiveTournament();
@@ -1565,7 +1603,7 @@ export default function Page() {
           <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={getCurrentRound(tournament)} />
         )}
         {tab === "history" && (
           <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />
