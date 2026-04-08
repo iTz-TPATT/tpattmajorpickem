@@ -194,10 +194,10 @@ function RadarChart({ data, accent }: {
   data: { label: string; value: number }[]; // value in SDs (-3 to 3)
   accent: string;
 }) {
-  const size = 130;
+  const size = 180;
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = 48;
+  const maxR = 58;
   const n = data.length;
 
   function polar(angle: number, r: number) {
@@ -206,19 +206,23 @@ function RadarChart({ data, accent }: {
   }
 
   function sdToR(sd: number) {
-    // Map -3..3 SDs to 0..maxR, center at maxR/2
     return Math.max(4, Math.min(maxR, (sd + 3) / 6 * maxR));
   }
 
   const angleStep = 360 / n;
   const points = data.map((d, i) => polar(i * angleStep, sdToR(d.value)));
   const polygon = points.map(p => `${p.x},${p.y}`).join(" ");
-
-  // Grid rings at -2, -1, 0 (avg), +1, +2 SDs
   const rings = [-2, -1, 0, 1, 2, 3].map(sd => sdToR(sd));
 
+  function splitLabel(label: string): [string, string | null] {
+    const words = label.split(" ");
+    if (words.length === 1) return [label, null];
+    const mid = Math.ceil(words.length / 2);
+    return [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
+  }
+
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} overflow="visible" style={{ overflow: "visible" }}>
       {/* Grid rings */}
       {rings.map((r, i) => (
         <circle key={i} cx={cx} cy={cy} r={r}
@@ -234,23 +238,26 @@ function RadarChart({ data, accent }: {
       <polygon points={polygon}
         fill={accent} fillOpacity={0.25}
         stroke={accent} strokeWidth={1.5} strokeLinejoin="round" />
-      {/* Dots at each vertex */}
+      {/* Dots */}
       {points.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={3} fill={accent} />
       ))}
-      {/* Labels */}
+      {/* Labels — two lines, pushed further out */}
       {data.map((d, i) => {
-        const lp = polar(i * angleStep, maxR + 16);
-        const isLeft = lp.x < cx - 5;
+        const lp = polar(i * angleStep, maxR + 24);
+        const isLeft = lp.x < cx - 8;
+        const isRight = lp.x > cx + 8;
+        const anchor = isLeft ? "end" : isRight ? "start" : "middle";
+        const [line1, line2] = splitLabel(d.label);
         return (
-          <text key={i} x={lp.x} y={lp.y + 4}
-            textAnchor={isLeft ? "end" : lp.x > cx + 5 ? "start" : "middle"}
-            fontSize={7.5} fill="rgba(255,255,255,0.7)" fontFamily="EB Garamond, serif">
-            {d.label}
+          <text key={i} x={lp.x} y={lp.y} textAnchor={anchor}
+            fontSize={9} fill="rgba(255,255,255,0.9)" fontFamily="EB Garamond, serif">
+            <tspan x={lp.x} dy="0">{line1}</tspan>
+            {line2 && <tspan x={lp.x} dy="11">{line2}</tspan>}
           </text>
         );
       })}
-      {/* Center "AVG" label */}
+      {/* Center AVG label */}
       <text x={cx} y={cy + 3} textAnchor="middle" fontSize={7} fill="rgba(255,255,255,0.3)">AVG</text>
     </svg>
   );
@@ -294,7 +301,7 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
           {/* Radar chart */}
           {radarData && (
-            <div style={{ flexShrink: 0 }}>
+            <div style={{ flexShrink: 0, padding: "0 20px" }}>
               <div style={{ fontSize: 9, color: "var(--accent)", letterSpacing: "0.1em", textAlign: "center", marginBottom: 4, textTransform: "uppercase" }}>
                 Skill Profile
               </div>
@@ -1431,11 +1438,11 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
     audioRef.current = audio;
 
     const t1 = setTimeout(() => setPhase("hold"), 600);
-    const t2 = setTimeout(() => setPhase("out"), 5500);
+    const t2 = setTimeout(() => setPhase("out"), 6000);
     const t3 = setTimeout(() => {
       onDone();
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    }, 6300);
+    }, 6800);
     return () => {
       clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
@@ -1463,7 +1470,7 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
           position: "absolute", inset: 0,
           backgroundImage: `url(${bgImage})`,
           backgroundSize: "cover", backgroundPosition: "right center",
-          opacity: 0.18, filter: "blur(1px)",
+          opacity: 0.45, filter: "none",
         }} />
       )}
       {/* Green gradient overlay */}
@@ -1755,7 +1762,13 @@ export default function Page() {
     const t = localStorage.getItem("mp_token");
     const u = localStorage.getItem("mp_username");
     const id = localStorage.getItem("mp_userId");
-    if (t && u && id) { setToken(t); setUsername(u); setUserId(id); }
+    if (t && u && id) {
+      setToken(t); setUsername(u); setUserId(id);
+      // Show splash once per session even if already logged in
+      if (!sessionStorage.getItem("mp_splash_shown")) {
+        setShowSplash(true);
+      }
+    }
     setHydrated(true);
   }, []);
 
@@ -1793,7 +1806,9 @@ export default function Page() {
     localStorage.setItem("mp_username", u);
     localStorage.setItem("mp_userId", payload.userId);
     setToken(t); setUsername(u); setUserId(payload.userId);
-    setShowSplash(true);
+    if (!sessionStorage.getItem("mp_splash_shown")) {
+      setShowSplash(true);
+    }
   }
 
   function handleLogout() {
@@ -1808,7 +1823,11 @@ export default function Page() {
   return (
     <div style={{ minHeight: "100vh", background: th.bg, color: th.cream, fontFamily: "EB Garamond, serif", paddingBottom: 80, ...themeVars(tournament) }}>
       {showSplash && !splashDone && (
-        <MastersSplash onDone={() => { setSplashDone(true); setShowSplash(false); }} bgImage="/splash-bg.jpg" />
+        <MastersSplash onDone={() => {
+          setSplashDone(true);
+          setShowSplash(false);
+          sessionStorage.setItem("mp_splash_shown", "1");
+        }} bgImage="/splash-bg.jpg" />
       )}
       <RoundLeaderBanner picks={picks} scores={scores} registeredUsers={registeredUsers} />
       <TournamentDayBanner />
