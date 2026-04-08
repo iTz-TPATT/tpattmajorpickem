@@ -4,15 +4,34 @@ import React, { useState, useEffect, useCallback } from "react";
 import { TOURNAMENTS } from "@/lib/tournaments";
 
 const ADMIN_GOLFERS = [
+  // ── Tier 1 — Favorites ──
   "Scottie Scheffler", "Rory McIlroy", "Jon Rahm", "Xander Schauffele",
   "Ludvig Åberg", "Collin Morikawa", "Viktor Hovland", "Tommy Fleetwood",
-  "Brooks Koepka", "Justin Thomas", "Patrick Cantlay", "Will Zalatoris",
-  "Shane Lowry", "Tony Finau", "Hideki Matsuyama", "Max Homa",
-  "Russell Henley", "Adam Scott", "Cameron Smith", "Dustin Johnson",
-  "Bryson DeChambeau", "Jordan Spieth", "Matt Fitzpatrick", "Tyrrell Hatton",
-  "Robert MacIntyre", "Tom Kim", "Sahith Theegala", "Sungjae Im",
-  "Akshay Bhatia", "Min Woo Lee",
-];
+  "Bryson DeChambeau", "Min Woo Lee",
+  // ── Tier 2 — Contenders ──
+  "Hideki Matsuyama", "Akshay Bhatia", "Patrick Reed", "Patrick Cantlay",
+  "Justin Thomas", "Jordan Spieth", "Matt Fitzpatrick", "Tyrrell Hatton",
+  "Robert MacIntyre", "Wyndham Clark", "Cameron Young", "Shane Lowry",
+  "Tony Finau", "Will Zalatoris", "Tom Kim", "Sahith Theegala",
+  "Sungjae Im", "Brooks Koepka", "Max Homa", "Russell Henley",
+  // ── Tier 3 — Dark Horses ──
+  "Adam Scott", "Sepp Straka", "Jason Day", "Corey Conners",
+  "Nicolai Hojgaard", "Rasmus Hojgaard", "Ryan Fox", "Sam Burns",
+  "Brian Harman", "Nick Taylor", "Harris English", "Si Woo Kim",
+  "Keegan Bradley", "J.J. Spaun", "Kurt Kitayama", "Davis Riley",
+  "Talor Gooch", "Tom Hoge", "Alex Noren", "Ben Griffin",
+  // ── LIV Players ──
+  "Cameron Smith", "Dustin Johnson", "Bubba Watson", "Phil Mickelson",
+  "Sergio Garcia", "Tyrrell Hatton", "Brooks Koepka", "Abraham Ancer",
+  "Haotong Li", "Carlos Ortiz", "Louis Oosthuizen", "Marc Leishman",
+  // ── Veterans / Past Champions ──
+  "Tiger Woods", "Fred Couples", "Vijay Singh", "Mike Weir",
+  "Zach Johnson", "Larry Mize", "Angel Cabrera", "Nick Faldo",
+  "Jose Maria Olazabal", "Danny Willett", "Charl Schwartzel",
+  // ── Rising Stars / First Timers ──
+  "Chris Gotterup", "Jacob Bridgeman", "Max Greyserman", "Sam Stevens",
+  "Casey Jarvis", "Wyndham Clark",
+].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
 interface GolferScore {
   name: string; espnId: string; headshot: null;
@@ -174,12 +193,8 @@ export default function AdminPage() {
 
   async function saveOverrides(next: Overrides) {
     setOverrides(next);
-    const ok = await call("save_overrides", { overrides: next });
-    if (ok) {
-      // broadcast refresh to other tabs / clients
-      try { localStorage.setItem("mp_data_refresh", String(Date.now())); } catch {}
-      showMsg("Overrides saved");
-    }
+    await call("save_overrides", { overrides: next });
+    showMsg("Overrides saved");
   }
 
   async function saveScores() {
@@ -189,10 +204,7 @@ export default function AdminPage() {
       totalScore: (s.r1 ?? 0) + (s.r2 ?? 0) + (s.r3 ?? 0) + (s.r4 ?? 0),
     }));
     const ok = await call("save_scores", { scores: withTotals });
-    if (ok) {
-      try { localStorage.setItem("mp_data_refresh", String(Date.now())); } catch {}
-      showMsg("Scores saved — leaderboard will update within seconds");
-    }
+    if (ok) showMsg("Scores saved — leaderboard will update within seconds");
   }
 
   function updateScore(name: string, field: "r1"|"r2"|"r3"|"r4"|"status", value: string) {
@@ -235,13 +247,7 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) { setProxyMsg(data.error ?? "Error"); setProxyMsgType("err"); }
-      else {
-        setProxyMsg(`✓ Picks submitted for ${user.username} — Round ${proxyRound}`);
-        setProxyMsgType("ok");
-        setProxyPicks([]);
-        // broadcast refresh so leaderboard and user pages update immediately
-        try { localStorage.setItem("mp_data_refresh", String(Date.now())); } catch {}
-      }
+      else { setProxyMsg(`✓ Picks submitted for ${user.username} — Round ${proxyRound}`); setProxyMsgType("ok"); setProxyPicks([]); }
     } catch { setProxyMsg("Network error"); setProxyMsgType("err"); }
     finally { setSaving(false); setTimeout(() => setProxyMsg(""), 4000); }
   }
@@ -333,25 +339,19 @@ export default function AdminPage() {
 
           <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" as const }}>
             <button onClick={fillRandomScores} style={S.btn("blue")}>🎲 Fill Random Scores</button>
-            <button onClick={async () => {
-              const ok = await call("wipe_picks", { tournament: selectedTournament });
-              if (ok) {
-                try { localStorage.setItem("mp_data_refresh", String(Date.now())); } catch {}
-                showMsg("All test picks wiped");
-              }
-            }} style={S.btn("red")}>
+            <button onClick={async () => { const ok = await call("wipe_picks", { tournament: selectedTournament }); if (ok) showMsg("All test picks wiped"); }} style={S.btn("red")}>
               🗑 Wipe All Picks
             </button>
             <button onClick={async () => {
-              const ok = await call("clear_overrides");
-              if (ok) { setOverrides({}); try { localStorage.setItem("mp_data_refresh", String(Date.now())); } catch {} showMsg("All overrides cleared — back to real mode"); }
-            }} style={S.btn("yellow")}>
+              const testOverrides = { roundOverride: 1, revealAll: true, skipDeadline: true, useManualScores: true };
+              await call("save_overrides", { overrides: testOverrides });
+              setOverrides(testOverrides);
+              showMsg("✓ Test mode ON — R1, reveal all, skip deadline, manual scores");
+            }} style={S.btn("green")}>🧪 Enable Full Test Mode</button>
+            <button onClick={async () => { const ok = await call("clear_overrides"); if (ok) { setOverrides({}); showMsg("All overrides cleared — back to real mode"); }}} style={S.btn("yellow")}>
               ↺ Clear All Overrides
             </button>
-            <button onClick={async () => {
-              const ok = await call("clear_score_cache");
-              if (ok) { try { localStorage.setItem("mp_data_refresh", String(Date.now())); } catch {} showMsg("Score cache cleared — ESPN will re-fetch"); }
-            }} style={S.btn("green")}>
+            <button onClick={async () => { const ok = await call("clear_score_cache"); if (ok) showMsg("Score cache cleared — ESPN will re-fetch"); }} style={S.btn("green")}>
               🔄 Force ESPN Re-fetch
             </button>
           </div>

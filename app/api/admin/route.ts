@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   if (action === "save_scores") {
     const scores = body.scores as unknown[];
     await supabase.from("score_cache").upsert({
-      tournament: "scores_masters",
+      tournament: "manual_scores_masters",
       data: scores,
       updated_at: new Date().toISOString(),
     });

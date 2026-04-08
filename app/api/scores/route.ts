@@ -82,7 +82,7 @@ export async function GET(request: Request) {
     const { data: manualScores } = await supabase
       .from("score_cache")
       .select("data")
-      .eq("tournament", `scores_${tournament}`)
+      .eq("tournament", `manual_scores_${tournament}`)
       .single();
     if (manualScores?.data) {
       return NextResponse.json({ scores: manualScores.data, source: "manual" });

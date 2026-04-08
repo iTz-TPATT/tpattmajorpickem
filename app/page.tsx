@@ -13,12 +13,6 @@ interface GolferScore {
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
 }
-interface Overrides {
-  roundOverride?: number;
-  revealAll?: boolean;
-  skipDeadline?: boolean;
-  useManualScores?: boolean;
-}
 type Tab = "picks" | "leaderboard" | "history" | "course";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -893,7 +887,7 @@ function MyPicksTab({
       </div>
 
       {/* Prior rounds summary */}
-      {[1, 2, 3, 4].filter((r) => r < round && isRoundRevealed(tournament, r)).map((r) => {
+      {[1, 2, 3, 4].filter((r) => r < round && allPicks.some(p => p.round_number === r)).map((r) => {
         const myPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === r).map((p) => p.golfer);
         if (!myPicks.length) return null;
         const roundScores = myPicks.map((g) => getRoundScore(scoreMap[g], r));
@@ -952,8 +946,8 @@ function LeaderboardTab({
     const roundBreakdowns: Record<number, { picks: string[]; score: number }> = {};
 
     for (let r = 1; r <= 4; r++) {
-      if (!isRoundRevealed(tournament, r)) continue;
       const rPicks = allPicks.filter((p) => p.user_id === uid && p.round_number === r).map((p) => p.golfer);
+      if (rPicks.length === 0) continue;
       if (!rPicks.length) continue;
       const roundScores = rPicks.map((g) => getRoundScore(scoreMap[g], r));
       const roundScore = calcRoundScore(roundScores, r);
@@ -1017,10 +1011,40 @@ function LeaderboardTab({
 
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>{u.username}</div>
-                <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 2 }}>{roundsPlayed} round{roundsPlayed !== 1 ? "s" : ""} counted</div>
+                {/* Round-by-round score pills */}
+                <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" as const }}>
+                  {Object.entries(u.rounds).map(([r, rd]) => (
+                    <span key={r} style={{
+                      fontSize: 11, padding: "1px 7px", borderRadius: 8,
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      color: scoreColor(rd.score), fontFamily: "monospace",
+                    }}>
+                      R{r} {fmtScore(rd.score)}
+                    </span>
+                  ))}
+                </div>
               </div>
 
-              <div style={{ fontSize: 22, fontFamily: "monospace", color: scoreColor(u.total), fontWeight: 600 }}>{fmtScore(u.total)}</div>
+              {/* Scores block */}
+              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                {/* Current round score */}
+                {roundsPlayed > 0 && (() => {
+                  const latestRound = Math.max(...Object.keys(u.rounds).map(Number));
+                  const latestScore = u.rounds[latestRound]?.score;
+                  return (
+                    <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>
+                      R{latestRound}: <span style={{ color: scoreColor(latestScore), fontFamily: "monospace" }}>{fmtScore(latestScore)}</span>
+                    </div>
+                  );
+                })()}
+                {/* Cumulative total */}
+                <div style={{ fontSize: 22, fontFamily: "monospace", color: scoreColor(u.total), fontWeight: 700, lineHeight: 1 }}>
+                  {fmtScore(u.total)}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--cream-dim)", letterSpacing: "0.06em" }}>TOTAL</div>
+              </div>
+
               <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>{isOpen ? "▲" : "▼"}</div>
             </button>
 
@@ -1069,7 +1093,8 @@ function LeaderboardTab({
 // ─── History Tab ──────────────────────────────────────────────────────────────
 function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; allPicks: Pick[]; scores: GolferScore[] }) {
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
-  const revealedRounds = [1, 2, 3, 4].filter((r) => isRoundRevealed(tournament, r));
+  // API already filters by revealAll override — show whatever came back
+  const revealedRounds = [1, 2, 3, 4].filter((r) => allPicks.some((p) => p.round_number === r));
 
   if (!revealedRounds.length) {
     return (
@@ -1404,24 +1429,6 @@ export default function Page() {
     const interval = setInterval(() => fetchData(token), 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, [token, fetchData]);
-    // === immediate refresh when admin updates scores/overrides/proxy picks ===
-  useEffect(() => {
-  if (!token) return;
-
-  function onStorage(e: StorageEvent) {
-    if (e.key === "mp_data_refresh") {
-      // Ensure token is non-null at call time (TypeScript-safe)
-      if (token) {
-        fetchData(token).catch(() => {
-          /* swallow errors from background refetch */
-        });
-      }
-    }
-  }
-
-  window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
-}, [token, fetchData]);
 
   function handleLogin(t: string, u: string) {
     const payload = JSON.parse(atob(t.split(".")[1]));
