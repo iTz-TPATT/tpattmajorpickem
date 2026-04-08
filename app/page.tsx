@@ -1308,20 +1308,7 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
 
 
 // ─── Tournament Leaderboard Tab ───────────────────────────────────────────────
-interface TournamentPlayer {
-  name: string;
-  position: string;
-  totalScore: number;
-  r1: number | null;
-  r2: number | null;
-  r3: number | null;
-  r4: number | null;
-  status: string;
-  headshot: string | null;
-  thru: string;
-}
-
-function TournamentLeaderboardTab({ scores }: { scores: TournamentPlayer[] }) {
+function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   function fmtScore(s: number | null) {
@@ -1409,7 +1396,7 @@ function TournamentLeaderboardTab({ scores }: { scores: TournamentPlayer[] }) {
                       whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.name}
                     </div>
-                    {p.thru && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>Thru {p.thru}</div>}
+                    
                   </div>
                 </div>
                 {/* Round scores */}
