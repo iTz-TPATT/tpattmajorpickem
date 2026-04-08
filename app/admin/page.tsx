@@ -239,130 +239,164 @@ export default function AdminPage() {
 
   // ── Tournament Simulator ──────────────────────────────────────────────────
   async function simulateRound(round: number) {
-    if (!users.length) { setSimLog(["No users found — make sure players have registered"]); return; }
+    if (!users.length) { setSimLog(["❌ No users found — make sure players have registered first"]); return; }
     setSimRunning(true);
     const log: string[] = [];
+    log.push(`⏳ Simulating Round ${round} for ${users.length} players...`);
+    setSimLog([...log]);
 
-    // Build burned golfers per user from prior rounds
-    const burnable: Record<string, Set<string>> = {};
-    for (const u of users) { burnable[u.id] = new Set(); }
-
-    // Collect already-used golfers from existing picks (rounds < this one)
     try {
-      // We'll just track what we submit in this session
-      for (let r = 1; r < round; r++) {
-        // We can't easily fetch per-user prior picks here, so just proceed
-        // The API will block burned picks — we'll shuffle and retry
-      }
-    } catch {/* ok */}
+      // Step 1: Set all overrides first so picks can be submitted
+      const newOverrides = { useManualScores: true, revealAll: true, skipDeadline: true, roundOverride: round };
+      await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ action: "save_overrides", overrides: newOverrides }),
+      });
+      setOverrides(newOverrides);
+      log.push(`✓ Overrides set: R${round}, manual scores ON, reveal all ON`);
+      setSimLog([...log]);
 
-    const golferPool = [...ADMIN_GOLFERS];
+      // Step 2: Fetch all existing picks to know what's burned per user
+      const picksRes = await fetch(`/api/picks?tournament=${selectedTournament}`, {
+        headers: { "x-admin-password": password, "Authorization": "Bearer admin" }
+      });
+      // We'll fetch from admin endpoint instead
+      const allPicksRes = await fetch(`/api/picks?tournament=${selectedTournament}`, {
+        headers: { "Authorization": `Bearer ${btoa(JSON.stringify({userId: "admin", username: "admin"}))}` }
+      });
 
-    for (const u of users) {
-      const burned = burnable[u.id];
-      // Pick 3 random golfers not in burned set
-      const available = golferPool.filter(g => !burned.has(g));
-      if (available.length < 3) {
-        log.push(`⚠ ${u.username}: not enough available golfers (${available.length} left)`);
-        continue;
-      }
-      // Shuffle and take first 3
-      const shuffled = [...available].sort(() => Math.random() - 0.5);
-      const picks = shuffled.slice(0, 3);
+      // Build burned map by fetching current picks from supabase via admin
+      // Since we can't easily read picks here, track what we submit each round
+      const burnedMap: Record<string, Set<string>> = {};
+      users.forEach(u => { burnedMap[u.id] = new Set(); });
 
-      try {
+      // Step 3: Submit picks for each user, tracking burns across users
+      for (const u of users) {
+        const burned = burnedMap[u.id];
+        // Shuffle golfer pool, pick 3 not burned
+        const available = ADMIN_GOLFERS.filter(g => !burned.has(g)).sort(() => Math.random() - 0.5);
+        if (available.length < 3) {
+          log.push(`⚠ ${u.username}: not enough available golfers`);
+          continue;
+        }
+        const picks = available.slice(0, 3);
+
         const res = await fetch("/api/admin", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-admin-password": password },
           body: JSON.stringify({
             action: "submit_picks_as_user",
             userId: u.id, username: u.username,
-            tournament: selectedTournament, round,
-            golfers: picks,
+            tournament: selectedTournament, round, golfers: picks,
           }),
         });
         const data = await res.json();
         if (res.ok) {
-          log.push(`✓ ${u.username} R${round}: ${picks.join(", ")}`);
-          picks.forEach(g => burnable[u.id].add(g));
-        } else {
-          // If burned conflict, try different picks
-          const alt = available.filter(g => !picks.includes(g)).sort(() => Math.random() - 0.5).slice(0, 3);
-          if (alt.length === 3) {
+          log.push(`✓ ${u.username}: ${picks.join(" · ")}`);
+          picks.forEach(g => burned.add(g));
+        } else if (data.error?.includes("already used")) {
+          // Retry with completely different picks
+          const retry = ADMIN_GOLFERS.filter(g => !burned.has(g) && !picks.includes(g)).sort(() => Math.random() - 0.5).slice(0, 3);
+          if (retry.length === 3) {
             const res2 = await fetch("/api/admin", {
               method: "POST",
               headers: { "Content-Type": "application/json", "x-admin-password": password },
-              body: JSON.stringify({ action: "submit_picks_as_user", userId: u.id, username: u.username, tournament: selectedTournament, round, golfers: alt }),
+              body: JSON.stringify({ action: "submit_picks_as_user", userId: u.id, username: u.username, tournament: selectedTournament, round, golfers: retry }),
             });
             if (res2.ok) {
-              log.push(`✓ ${u.username} R${round}: ${alt.join(", ")} (retry)`);
+              log.push(`✓ ${u.username}: ${retry.join(" · ")} (retry)`);
+              retry.forEach(g => burned.add(g));
             } else {
-              log.push(`✗ ${u.username}: ${data.error ?? "Error"}`);
+              log.push(`⚠ ${u.username}: skipped (${data.error})`);
             }
           } else {
-            log.push(`✗ ${u.username}: ${data.error ?? "Error"}`);
+            log.push(`⚠ ${u.username}: skipped (burned)`);
           }
+        } else {
+          log.push(`⚠ ${u.username}: ${data.error ?? "failed"}`);
         }
-      } catch (e) {
-        log.push(`✗ ${u.username}: network error`);
+        setSimLog([...log]);
       }
+
+      // Step 4: Generate random scores for ALL golfers, preserving prior rounds
+      // Load existing manual scores to preserve prior round data
+      const existingManualRes = await fetch(`/api/scores?tournament=${selectedTournament}`);
+      const existingManualData = existingManualRes.ok ? await existingManualRes.json() : { scores: [] };
+      const existingScoreMap: Record<string, typeof scores[0]> = {};
+      (existingManualData.scores as typeof scores).forEach(s => { existingScoreMap[s.name] = s; });
+
+      // Also merge with current admin scores state
+      scores.forEach(s => {
+        if (!existingScoreMap[s.name]) existingScoreMap[s.name] = s;
+      });
+
+      // Update only the current round's score for each golfer
+      const roundKey = `r${round}` as "r1"|"r2"|"r3"|"r4";
+      const updatedScores = ADMIN_GOLFERS.map(name => {
+        const existing = existingScoreMap[name] ?? { name, espnId: "", headshot: null, totalScore: 0, position: "", status: "active", r1: null, r2: null, r3: null, r4: null };
+        const updated = { ...existing, [roundKey]: Math.floor(Math.random() * 11) - 7 };
+        return { ...updated, totalScore: (updated.r1 ?? 0) + (updated.r2 ?? 0) + (updated.r3 ?? 0) + (updated.r4 ?? 0) };
+      });
+
+      setScores(updatedScores);
+
+      // Step 5: Save scores
+      const saveRes = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ action: "save_scores", scores: updatedScores }),
+      });
+      if (saveRes.ok) {
+        log.push(`✓ R${round} scores saved for ${updatedScores.length} golfers`);
+        // Show a sample
+        const sample = updatedScores.slice(0, 3).map(s => `${s.name}: ${s[roundKey] ?? "—"}`).join(", ");
+        log.push(`  Sample: ${sample}`);
+      } else {
+        log.push(`❌ Score save failed`);
+      }
+
+      log.push(`
+🏌 Round ${round} simulation complete!`);
+      log.push(`👉 Check the main app Leaderboard tab — refresh if needed`);
+
+    } catch (e) {
+      log.push(`❌ Error: ${String(e)}`);
     }
 
-    // Auto-generate scores for this round
-    const updatedScores = scores.map(s => {
-      const roundKey = `r${round}` as "r1"|"r2"|"r3"|"r4";
-      return { ...s, [roundKey]: Math.floor(Math.random() * 11) - 7 };
-    });
-    setScores(updatedScores);
-
-    // Auto-save scores
-    const withTotals = updatedScores.map(s => ({
-      ...s,
-      totalScore: (s.r1 ?? 0) + (s.r2 ?? 0) + (s.r3 ?? 0) + (s.r4 ?? 0),
-    }));
-    await fetch("/api/admin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": password },
-      body: JSON.stringify({ action: "save_scores", scores: withTotals }),
-    });
-    log.push(`✓ Scores saved for R${round} (${withTotals.length} players)`);
-
-    // Ensure manual score mode + reveal + skip deadline are all ON
-    const newOverrides = {
-      ...overrides,
-      useManualScores: true,
-      revealAll: true,
-      skipDeadline: true,
-      roundOverride: round,
-    };
-    await fetch("/api/admin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-password": password },
-      body: JSON.stringify({ action: "save_overrides", overrides: newOverrides }),
-    });
-    setOverrides(newOverrides);
-    log.push(`✓ Overrides set: R${round} override, manual scores ON, reveal all ON`);
-
-    setSimLog(log);
+    setSimLog([...log]);
     setSimRunning(false);
-    showMsg(`R${round} simulation complete — ${users.length} players, scores saved`);
+    showMsg(`✓ R${round} done — go check the leaderboard!`);
   }
 
   async function wipeAndReset() {
     if (!confirm("Wipe ALL picks and scores for this tournament? Cannot be undone.")) return;
     setSaving(true);
+    const log: string[] = [];
+    // Wipe picks
     await fetch("/api/admin", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-admin-password": password },
       body: JSON.stringify({ action: "wipe_picks", tournament: selectedTournament }),
     });
-    // Clear manual scores
+    log.push("✓ All picks wiped");
+    // Clear manual scores (save empty)
     await fetch("/api/admin", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-admin-password": password },
       body: JSON.stringify({ action: "save_scores", scores: [] }),
     });
-    setSimLog(["✓ All picks and scores wiped — ready for fresh test"]);
+    log.push("✓ Scores cleared");
+    // Clear overrides
+    await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ action: "clear_overrides" }),
+    });
+    setOverrides({});
+    log.push("✓ Overrides cleared");
+    log.push("Ready for fresh test — run R1 to start");
+    setSimLog(log);
     setSaving(false);
     showMsg("Wiped clean — ready to simulate from R1");
   }

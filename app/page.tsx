@@ -1092,26 +1092,43 @@ function LeaderboardTab({
                       fontFamily: "Playfair Display, serif",
                       whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis",
                     }}>{u.username}</div>
-                    {/* Next round pick submitted badge */}
-                    {nextRound <= 4 && submittedNextRound.has(u.uid) && (
-                      <span title={`R${nextRound} picks submitted`} style={{
-                        fontSize: 9, padding: "1px 5px", borderRadius: 4,
-                        background: "rgba(93,186,126,0.18)",
-                        border: "1px solid rgba(93,186,126,0.35)",
-                        color: "#5dba7e", letterSpacing: "0.06em", fontFamily: "monospace",
-                        flexShrink: 0,
-                      }}>R{nextRound} ✓</span>
-                    )}
-                    {/* Current round not submitted warning */}
-                    {!submittedCurrentRound.has(u.uid) && currentRound <= 4 && (
-                      <span title={`R${currentRound} picks not submitted`} style={{
-                        fontSize: 9, padding: "1px 5px", borderRadius: 4,
-                        background: "rgba(192,57,43,0.15)",
-                        border: "1px solid rgba(192,57,43,0.3)",
-                        color: "#c0392b", letterSpacing: "0.06em", fontFamily: "monospace",
-                        flexShrink: 0,
-                      }}>NO PICK</span>
-                    )}
+                    {/* Round pick status badges — show status for each active round */}
+                    {currentRound <= 4 && (() => {
+                      const hasCurrentPick = submittedCurrentRound.has(u.uid);
+                      const hasNextPick = nextRound <= 4 && submittedNextRound.has(u.uid);
+                      return (
+                        <>
+                          {/* Current round: green check or red NO PICK */}
+                          {hasCurrentPick ? (
+                            <span title={`R${currentRound} picks submitted`} style={{
+                              fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                              background: "rgba(93,186,126,0.18)",
+                              border: "1px solid rgba(93,186,126,0.35)",
+                              color: "#5dba7e", letterSpacing: "0.06em", fontFamily: "monospace",
+                              flexShrink: 0,
+                            }}>R{currentRound} ✓</span>
+                          ) : (
+                            <span title={`R${currentRound} picks not submitted`} style={{
+                              fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                              background: "rgba(192,57,43,0.15)",
+                              border: "1px solid rgba(192,57,43,0.3)",
+                              color: "#c0392b", letterSpacing: "0.06em", fontFamily: "monospace",
+                              flexShrink: 0,
+                            }}>R{currentRound} —</span>
+                          )}
+                          {/* Next round: green check if already submitted */}
+                          {hasNextPick && (
+                            <span title={`R${nextRound} picks already in`} style={{
+                              fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                              background: "rgba(93,186,126,0.10)",
+                              border: "1px solid rgba(93,186,126,0.25)",
+                              color: "#5dba7e", letterSpacing: "0.06em", fontFamily: "monospace",
+                              flexShrink: 0, opacity: 0.8,
+                            }}>R{nextRound} ✓</span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   {isOpen && (
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>tap to collapse</div>
