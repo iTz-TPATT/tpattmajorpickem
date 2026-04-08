@@ -1325,7 +1325,7 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
     return <span style={{ color: s < 0 ? "#c0392b" : "#888", fontWeight: 700 }}>{s > 0 ? `+${s}` : s}</span>;
   }
 
-  const active = scores.filter(p => p.status === "active");
+  const active = [...scores].filter(p => p.status === "active").sort((a, b) => a.totalScore - b.totalScore);
   const cut = scores.filter(p => p.status !== "active");
 
   if (!scores.length) {
@@ -1458,54 +1458,92 @@ const NEWSROOM_ACCOUNTS = [
   { handle: "ReadTheLine_",  label: "Read The Line",   emoji: "📊", desc: "In-depth golf betting analysis" },
 ];
 
+function TwitterEmbed({ handle }: { handle: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = "";
+    setStatus("loading");
+
+    const doEmbed = () => {
+      if (!containerRef.current) return;
+      (window as any).twttr.widgets.createTimeline(
+        { sourceType: "profile", screenName: handle },
+        containerRef.current,
+        {
+          theme: "dark",
+          chrome: "noheader nofooter noborders transparent",
+          tweetLimit: 8,
+          height: 600,
+        }
+      ).then((el: unknown) => {
+        setStatus(el ? "ok" : "error");
+      }).catch(() => setStatus("error"));
+    };
+
+    if ((window as any).twttr?.widgets?.createTimeline) {
+      doEmbed();
+    } else {
+      const existing = document.querySelector("script[src*='platform.twitter.com']");
+      if (!existing) {
+        const s = document.createElement("script");
+        s.src = "https://platform.twitter.com/widgets.js";
+        s.async = true;
+        s.onload = doEmbed;
+        s.onerror = () => setStatus("error");
+        document.head.appendChild(s);
+      } else {
+        // Script already in DOM but twttr not ready yet — poll
+        let tries = 0;
+        const poll = setInterval(() => {
+          tries++;
+          if ((window as any).twttr?.widgets?.createTimeline) {
+            clearInterval(poll);
+            doEmbed();
+          } else if (tries > 20) {
+            clearInterval(poll);
+            setStatus("error");
+          }
+        }, 250);
+      }
+    }
+  }, [handle]);
+
+  return (
+    <div style={{ position: "relative", minHeight: 300 }}>
+      {status === "loading" && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex", flexDirection: "column" as const,
+          alignItems: "center", justifyContent: "center", gap: 12,
+        }}>
+          <div style={{ fontSize: 28, opacity: 0.6 }}>𝕏</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Loading @{handle}…</div>
+        </div>
+      )}
+      {status === "error" && (
+        <div style={{
+          display: "flex", flexDirection: "column" as const, alignItems: "center",
+          justifyContent: "center", gap: 12, padding: 40,
+        }}>
+          <div style={{ fontSize: 28 }}>𝕏</div>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textAlign: "center" as const }}>
+            Twitter embed blocked by your browser or ad blocker.
+          </div>
+          <a href={`https://twitter.com/${handle}`} target="_blank" rel="noopener noreferrer"
+            style={{ padding: "10px 20px", background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)", borderRadius: 8, color: "var(--accent)", textDecoration: "none", fontSize: 14 }}>
+            Open @{handle} on X ↗
+          </a>
+        </div>
+      )}
+      <div ref={containerRef} />
+    </div>
+  );
+}
+
 function NewsroomTab() {
   const [selected, setSelected] = useState("TheMasters");
-  const [loaded, setLoaded] = useState(false);
-  const embedRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Load Twitter widgets.js once
-    if (!(window as any).twttr) {
-      const script = document.createElement("script");
-      script.src = "https://platform.twitter.com/widgets.js";
-      script.async = true;
-      script.onload = () => setLoaded(true);
-      document.head.appendChild(script);
-    } else {
-      setLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!embedRef.current) return;
-    setLoaded(false);
-    embedRef.current.innerHTML = "";
-
-    const anchor = document.createElement("a");
-    anchor.className = "twitter-timeline";
-    anchor.href = `https://twitter.com/${selected}`;
-    anchor.setAttribute("data-theme", "dark");
-    anchor.setAttribute("data-chrome", "noheader nofooter noborders transparent");
-    anchor.setAttribute("data-tweet-limit", "8");
-    anchor.setAttribute("data-height", "640");
-    anchor.textContent = `Tweets by @${selected}`;
-    embedRef.current.appendChild(anchor);
-
-    if ((window as any).twttr?.widgets) {
-      (window as any).twttr.widgets.load(embedRef.current);
-      setTimeout(() => setLoaded(true), 1200);
-    } else {
-      const script = document.createElement("script");
-      script.src = "https://platform.twitter.com/widgets.js";
-      script.async = true;
-      script.onload = () => {
-        (window as any).twttr?.widgets?.load(embedRef.current!);
-        setTimeout(() => setLoaded(true), 1200);
-      };
-      document.head.appendChild(script);
-    }
-  }, [selected]);
-
   const account = NEWSROOM_ACCOUNTS.find(a => a.handle === selected)!;
 
   return (
@@ -1561,21 +1599,12 @@ function NewsroomTab() {
         </a>
       </div>
 
-      {/* Twitter embed */}
+      {/* Twitter embed — key forces full remount on account change */}
       <div style={{
         background: "var(--card-bg)", border: "1px solid var(--card-border)",
-        borderRadius: 10, overflow: "hidden", minHeight: 400, position: "relative",
+        borderRadius: 10, overflow: "hidden", minHeight: 400,
       }}>
-        {!loaded && (
-          <div style={{
-            position: "absolute", inset: 0, display: "flex", flexDirection: "column" as const,
-            alignItems: "center", justifyContent: "center", gap: 12,
-          }}>
-            <div style={{ fontSize: 28 }}>𝕏</div>
-            <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>Loading @{selected}…</div>
-          </div>
-        )}
-        <div ref={embedRef} style={{ padding: "0 4px" }} />
+        <TwitterEmbed key={selected} handle={selected} />
       </div>
 
       <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: 12 }}>
