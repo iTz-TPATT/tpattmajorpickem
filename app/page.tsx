@@ -638,7 +638,7 @@ function CourseHero({ tournament, splashDone }: { tournament: Tournament; splash
           key={`${tournament.id}-${idx}`}
           src={photo.url}
           alt={photo.caption}
-          onLoad={() => { setOpacity(1); startTimer(); }}
+          onLoad={() => { setOpacity(1); }}
           onError={(e) => {
             const fb = photos[idx]?.fallbackUrl;
             if (fb && (e.target as HTMLImageElement).src !== fb) {
@@ -1041,9 +1041,9 @@ function LeaderboardTab({
         {/* Column headers — Masters scoreboard style */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "min(30px,8vw) min(30px,8vw) 1fr min(40px,11vw) min(40px,11vw) min(40px,11vw) min(40px,11vw) min(52px,14vw)",
+          gridTemplateColumns: "min(28px,7vw) min(28px,7vw) 1fr min(34px,9vw) min(34px,9vw) min(34px,9vw) min(34px,9vw) min(46px,12vw)",
           alignItems: "center",
-          padding: "6px 10px",
+          padding: "6px 8px",
           background: "rgba(0,0,0,0.25)",
           borderTop: "1px solid rgba(255,255,255,0.08)",
         }}>
@@ -1074,9 +1074,9 @@ function LeaderboardTab({
                 style={{
                   width: "100%",
                   display: "grid",
-                  gridTemplateColumns: "min(30px,8vw) min(30px,8vw) 1fr min(40px,11vw) min(40px,11vw) min(40px,11vw) min(40px,11vw) min(52px,14vw)",
+                  gridTemplateColumns: "min(28px,7vw) min(28px,7vw) 1fr min(34px,9vw) min(34px,9vw) min(34px,9vw) min(34px,9vw) min(46px,12vw)",
                   alignItems: "center",
-                  padding: "11px 10px",
+                  padding: "10px 8px",
                   background: isLeader
                     ? "linear-gradient(90deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.04) 100%)"
                     : i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
@@ -1356,8 +1356,8 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
       <div style={{
         background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
         border: "1px solid #2d6b40", borderRadius: "10px 10px 0 0",
-        display: "grid", gridTemplateColumns: "min(38px,10vw) 1fr min(40px,11vw) min(40px,11vw) min(40px,11vw) min(40px,11vw) min(54px,14vw)",
-        padding: "8px 10px", gap: 2,
+        display: "grid", gridTemplateColumns: "min(32px,8vw) 1fr min(34px,9vw) min(34px,9vw) min(34px,9vw) min(34px,9vw) min(46px,12vw)",
+        padding: "8px 8px", gap: 2,
       }}>
         {["POS","PLAYER","R1","R2","R3","R4","TOTAL"].map(h => (
           <div key={h} style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textAlign: h === "PLAYER" ? "left" as const : "center" as const }}>{h}</div>
@@ -2054,7 +2054,7 @@ export default function Page() {
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const [showSplash, setShowSplash] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
+  const [splashDone, setSplashDone] = useState(() => !!sessionStorage.getItem("mp_splash_shown"));
   const [musicMuted, setMusicMuted] = useState(true);
   const musicRef = useRef<HTMLAudioElement | null>(null);
 
@@ -2213,11 +2213,11 @@ export default function Page() {
             cursor: "pointer", fontFamily: "Playfair Display, serif",
             fontWeight: tab === t ? 600 : 400, transition: "all 0.2s", whiteSpace: "nowrap" as const,
           }}>
-            {t === "picks" ? "My Picks"
-              : t === "leaderboard" ? "Pick'em Leaderboard"
+            {t === "picks" ? "🎯 My Picks"
+              : t === "leaderboard" ? "🪙 Pick'em Leaderboard"
               : t === "tournament" ? "⛳ Tournament"
-              : t === "history" ? "History"
-              : t === "course" ? "Course Guide"
+              : t === "history" ? "📜 History"
+              : t === "course" ? "🔍 Course Guide"
               : "📡 Newsroom"}
           </button>
         ))}

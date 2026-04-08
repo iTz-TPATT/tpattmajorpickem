@@ -108,3 +108,11 @@ img { max-width: 100%; height: auto; }
 @media (max-width: 450px) {
   .lb-r-col { font-size: 11px !important; }
 }
+
+/* Leaderboard round score cells — smaller on mobile */
+@media (max-width: 430px) {
+  .lb-grid-header > div,
+  .lb-grid-row > div { font-size: 10px !important; }
+  .tlb-grid-header > div,
+  .tlb-grid-row > div { font-size: 10px !important; }
+}
