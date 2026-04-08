@@ -289,8 +289,8 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
     <div style={{
       position: "absolute", bottom: "110%", left: "50%", transform: "translateX(-50%)",
       background: "var(--bg-dark)", border: "1px solid var(--card-border)",
-      borderRadius: 10, padding: "12px 14px", zIndex: 100,
-      minWidth: radarData ? 340 : 200, maxWidth: 420,
+      borderRadius: 10, padding: "12px 14px", zIndex: 1000,
+      minWidth: radarData ? 340 : 200, maxWidth: "min(420px, 90vw)",
       boxShadow: "0 8px 32px rgba(0,0,0,0.7)", pointerEvents: "none",
     }}>
       {!stats ? (
@@ -384,15 +384,95 @@ function GolferCard({
   cut: boolean; disabled: boolean; odds: string; espnId: string; headshot: string | null;
   onClick: () => void;
 }) {
-  const [hover, setHover] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const totalScore = score?.totalScore ?? null;
+
+  // Desktop: hover to show stats
+  function handleMouseEnter() { setStatsOpen(true); }
+  function handleMouseLeave() { setStatsOpen(false); }
+
+  // Mobile: long press to toggle stats
+  function handleTouchStart() {
+    longPressTimer.current = setTimeout(() => setStatsOpen(prev => !prev), 500);
+  }
+  function handleTouchEnd() {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }
+
+  // Close stats when tapping elsewhere
+  useEffect(() => {
+    if (!statsOpen) return;
+    const close = () => setStatsOpen(false);
+    document.addEventListener("touchstart", close, { once: true, capture: true });
+    return () => document.removeEventListener("touchstart", close, { capture: true });
+  }, [statsOpen]);
 
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       style={{ position: "relative" }}
     >
+      <button
+        onClick={onClick}
+        disabled={disabled || burned || cut}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+          background: selected ? "rgba(var(--accent-rgb, 201,168,76), 0.15)" : burned || cut ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${selected ? "var(--accent)" : burned || cut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.08)"}`,
+          borderRadius: 8, cursor: burned || cut || disabled ? "not-allowed" : "pointer",
+          opacity: burned || cut ? 0.45 : 1, transition: "all 0.15s", textAlign: "left",
+        }}
+      >
+        {/* Headshot */}
+        <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)" }}>
+          {headshot ? (
+            
+            <img src={headshot} alt={name} width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          ) : (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "var(--cream-dim)" }}>
+              {name[0]}
+            </div>
+          )}
+        </div>
+
+        {/* Name & badges */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: 14, color: selected ? "var(--accent)" : burned || cut ? "var(--cream-dim)" : "var(--cream)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {name}
+            </div>
+            {/* Stats hint on mobile */}
+            {espnId && !burned && !cut && (
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>hold</span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 2, alignItems: "center" }}>
+            {burned && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", color: "var(--cream-dim)", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>USED</span>}
+            {cut && <span style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "#e07b6f", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>CUT</span>}
+            {odds && !burned && !cut && <span style={{ fontSize: 11, color: "var(--accent-light, var(--accent))", opacity: 0.8 }}>{odds}</span>}
+            {score?.position && !burned && !cut && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+          </div>
+        </div>
+
+        {/* Score */}
+        <div style={{ fontSize: 15, fontFamily: "monospace", color: scoreColor(totalScore), flexShrink: 0 }}>
+          {fmtScore(totalScore)}
+        </div>
+      </button>
+
+      {/* Stats tooltip — hover on desktop, long press on mobile */}
+      {statsOpen && espnId && !burned && !cut && (
+        <StatsTooltip espnId={espnId} playerName={name} visible={statsOpen} />
+      )}
+    </div>
+  );
+}
+
+
       <button
         onClick={onClick}
         disabled={disabled || burned || cut}
