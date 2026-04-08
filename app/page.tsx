@@ -13,7 +13,7 @@ interface GolferScore {
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
 }
-type Tab = "picks" | "leaderboard" | "history" | "course";
+type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function normalizeName(name: string): string {
@@ -1307,6 +1307,297 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
 }
 
 
+// ─── Tournament Leaderboard Tab ───────────────────────────────────────────────
+interface TournamentPlayer {
+  name: string;
+  position: string;
+  totalScore: number;
+  r1: number | null;
+  r2: number | null;
+  r3: number | null;
+  r4: number | null;
+  status: string;
+  headshot: string | null;
+  thru: string;
+}
+
+function TournamentLeaderboardTab({ scores }: { scores: TournamentPlayer[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  function fmtScore(s: number | null) {
+    if (s === null) return <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>;
+    if (s === 0) return <span style={{ color: "rgba(255,255,255,0.7)" }}>E</span>;
+    return <span style={{ color: s < 0 ? "#c0392b" : "#888" }}>{s > 0 ? `+${s}` : s}</span>;
+  }
+
+  function fmtTotal(s: number | null, status: string) {
+    if (status === "cut") return <span style={{ color: "#666", fontSize: 12 }}>CUT</span>;
+    if (status === "wd")  return <span style={{ color: "#666", fontSize: 12 }}>WD</span>;
+    if (s === null) return <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>;
+    if (s === 0) return <span style={{ color: "rgba(240,233,214,0.9)" }}>E</span>;
+    return <span style={{ color: s < 0 ? "#c0392b" : "#888", fontWeight: 700 }}>{s > 0 ? `+${s}` : s}</span>;
+  }
+
+  const active = scores.filter(p => p.status === "active");
+  const cut = scores.filter(p => p.status !== "active");
+
+  if (!scores.length) {
+    return (
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 10, padding: 32, textAlign: "center" as const }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⛳</div>
+        <div style={{ fontSize: 16, color: "var(--cream)", marginBottom: 8 }}>Tournament hasn't started yet</div>
+        <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>Live leaderboard will appear here once Round 1 begins on April 9th.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 4 }}>Live</div>
+        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)" }}>Masters Leaderboard</div>
+        <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 4 }}>Augusta National · {active.length} players · Updated every 2 min</div>
+      </div>
+
+      {/* Header */}
+      <div style={{
+        background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
+        border: "1px solid #2d6b40", borderRadius: "10px 10px 0 0",
+        display: "grid", gridTemplateColumns: "42px 1fr 48px 48px 48px 48px 64px",
+        padding: "8px 16px", gap: 4,
+      }}>
+        {["POS","PLAYER","R1","R2","R3","R4","TOTAL"].map(h => (
+          <div key={h} style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textAlign: h === "PLAYER" ? "left" as const : "center" as const }}>{h}</div>
+        ))}
+      </div>
+
+      {/* Players */}
+      <div style={{ border: "1px solid #2d6b40", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden", marginBottom: 16 }}>
+        {active.map((p, i) => {
+          const isOpen = expanded === p.name;
+          const isLeader = i === 0;
+          const isTied = i > 0 && p.totalScore === active[i-1].totalScore;
+          return (
+            <div key={p.name} style={{ borderBottom: i < active.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+              <button onClick={() => setExpanded(isOpen ? null : p.name)} style={{
+                width: "100%", display: "grid",
+                gridTemplateColumns: "42px 1fr 48px 48px 48px 48px 64px",
+                alignItems: "center", padding: "11px 16px", gap: 4,
+                background: isLeader
+                  ? "linear-gradient(90deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.04) 100%)"
+                  : i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left" as const,
+              }}>
+                {/* Position */}
+                <div style={{ fontSize: 13, fontWeight: 700, textAlign: "center" as const, fontFamily: "monospace",
+                  color: isLeader ? "#c9a84c" : "rgba(255,255,255,0.5)" }}>
+                  {isTied ? `T${i+1}` : `${i+1}`}
+                </div>
+                {/* Name + headshot */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                  {p.headshot ? (
+                    <img src={p.headshot} alt={p.name}
+                      style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: isLeader ? "1px solid rgba(201,168,76,0.5)" : "1px solid rgba(255,255,255,0.1)" }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
+                  )}
+                  <div style={{ overflow: "hidden" }}>
+                    <div style={{ fontSize: 14, fontWeight: isLeader ? 600 : 400,
+                      color: isLeader ? "#c9a84c" : "#e8dcc8", fontFamily: "Playfair Display, serif",
+                      whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {p.name}
+                    </div>
+                    {p.thru && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>Thru {p.thru}</div>}
+                  </div>
+                </div>
+                {/* Round scores */}
+                {[p.r1, p.r2, p.r3, p.r4].map((r, ri) => (
+                  <div key={ri} style={{ textAlign: "center" as const, fontFamily: "monospace", fontSize: 13 }}>{fmtScore(r)}</div>
+                ))}
+                {/* Total */}
+                <div style={{ textAlign: "center" as const, fontFamily: "monospace", fontSize: 15 }}>{fmtTotal(p.totalScore, p.status)}</div>
+              </button>
+              {isOpen && (
+                <div style={{ padding: "8px 16px 12px", background: "rgba(0,0,0,0.2)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    {p.headshot && (
+                      <img src={p.headshot} alt={p.name} style={{ width: 60, height: 60, borderRadius: 8, objectFit: "cover", border: "1px solid rgba(201,168,76,0.3)" }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    )}
+                    <div>
+                      <div style={{ fontSize: 15, color: "var(--cream)", fontFamily: "Playfair Display, serif", marginBottom: 4 }}>{p.name}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                        {[["R1", p.r1], ["R2", p.r2], ["R3", p.r3], ["R4", p.r4]].map(([label, val]) => val !== null && (
+                          <div key={label as string} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, padding: "4px 10px", fontSize: 12, color: "var(--cream-dim)" }}>
+                            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>{label} </span>
+                            {fmtScore(val as number)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Cut/WD players */}
+        {cut.length > 0 && (
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", padding: "6px 16px", background: "rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", marginBottom: 6 }}>CUT / WD</div>
+            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+              {cut.map(p => (
+                <span key={p.name} style={{ fontSize: 12, color: "#666", textDecoration: "line-through", padding: "2px 6px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>{p.name}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Newsroom Tab ─────────────────────────────────────────────────────────────
+const NEWSROOM_ACCOUNTS = [
+  { handle: "TheMasters",    label: "The Masters",     emoji: "🌿", desc: "Official updates, scores & highlights" },
+  { handle: "PGATOUR",       label: "PGA Tour",        emoji: "⛳", desc: "News, quotes & player insights" },
+  { handle: "ForePlayPod",   label: "Fore Play",       emoji: "🎙️", desc: "Barstool golf entertainment" },
+  { handle: "SI_Golf",       label: "Sports Illustrated Golf", emoji: "📰", desc: "Expert commentary & live news" },
+  { handle: "GolfDigest",    label: "Golf Digest",     emoji: "📋", desc: "Analysis & weekend coverage" },
+  { handle: "TourPicks",     label: "Tour Picks",      emoji: "🎯", desc: "Weekly golf betting previews" },
+  { handle: "ReadTheLine_",  label: "Read The Line",   emoji: "📊", desc: "In-depth golf betting analysis" },
+];
+
+function NewsroomTab() {
+  const [selected, setSelected] = useState("TheMasters");
+  const [loaded, setLoaded] = useState(false);
+  const embedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load Twitter widgets.js once
+    if (!(window as any).twttr) {
+      const script = document.createElement("script");
+      script.src = "https://platform.twitter.com/widgets.js";
+      script.async = true;
+      script.onload = () => setLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!embedRef.current) return;
+    setLoaded(false);
+    embedRef.current.innerHTML = "";
+
+    const anchor = document.createElement("a");
+    anchor.className = "twitter-timeline";
+    anchor.href = `https://twitter.com/${selected}`;
+    anchor.setAttribute("data-theme", "dark");
+    anchor.setAttribute("data-chrome", "noheader nofooter noborders transparent");
+    anchor.setAttribute("data-tweet-limit", "8");
+    anchor.setAttribute("data-height", "640");
+    anchor.textContent = `Tweets by @${selected}`;
+    embedRef.current.appendChild(anchor);
+
+    if ((window as any).twttr?.widgets) {
+      (window as any).twttr.widgets.load(embedRef.current);
+      setTimeout(() => setLoaded(true), 1200);
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://platform.twitter.com/widgets.js";
+      script.async = true;
+      script.onload = () => {
+        (window as any).twttr?.widgets?.load(embedRef.current!);
+        setTimeout(() => setLoaded(true), 1200);
+      };
+      document.head.appendChild(script);
+    }
+  }, [selected]);
+
+  const account = NEWSROOM_ACCOUNTS.find(a => a.handle === selected)!;
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
+          Live Feed
+        </div>
+        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)", marginBottom: 4 }}>
+          Golf Newsroom
+        </div>
+        <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>
+          Live updates from the best golf accounts on X — tap any source to switch feeds.
+        </div>
+      </div>
+
+      {/* Account selector */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 20 }}>
+        {NEWSROOM_ACCOUNTS.map(a => (
+          <button key={a.handle} onClick={() => setSelected(a.handle)} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "7px 12px", borderRadius: 20, fontSize: 13, cursor: "pointer",
+            fontFamily: "EB Garamond, serif",
+            background: selected === a.handle ? "var(--accent)" : "var(--card-bg)",
+            color: selected === a.handle ? "var(--bg)" : "var(--cream-dim)",
+            border: `1px solid ${selected === a.handle ? "var(--accent)" : "var(--card-border)"}`,
+            fontWeight: selected === a.handle ? 700 : 400,
+            transition: "all 0.2s",
+          }}>
+            <span>{a.emoji}</span>
+            <span>@{a.handle}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Active account info */}
+      <div style={{
+        background: "var(--card-bg)", border: "1px solid var(--card-border)",
+        borderRadius: 10, padding: "12px 16px", marginBottom: 16,
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <span style={{ fontSize: 22 }}>{account.emoji}</span>
+        <div>
+          <div style={{ fontSize: 15, color: "var(--cream)", fontWeight: 600 }}>
+            {account.label} <span style={{ color: "var(--accent)", fontWeight: 400, fontSize: 13 }}>@{account.handle}</span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>{account.desc}</div>
+        </div>
+        <a href={`https://twitter.com/${account.handle}`} target="_blank" rel="noopener noreferrer"
+          style={{ marginLeft: "auto", fontSize: 12, color: "var(--accent)", textDecoration: "none", flexShrink: 0, padding: "4px 10px", border: "1px solid var(--card-border)", borderRadius: 6 }}>
+          Open on X ↗
+        </a>
+      </div>
+
+      {/* Twitter embed */}
+      <div style={{
+        background: "var(--card-bg)", border: "1px solid var(--card-border)",
+        borderRadius: 10, overflow: "hidden", minHeight: 400, position: "relative",
+      }}>
+        {!loaded && (
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", flexDirection: "column" as const,
+            alignItems: "center", justifyContent: "center", gap: 12,
+          }}>
+            <div style={{ fontSize: 28 }}>𝕏</div>
+            <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>Loading @{selected}…</div>
+          </div>
+        )}
+        <div ref={embedRef} style={{ padding: "0 4px" }} />
+      </div>
+
+      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: 12 }}>
+        Powered by X (Twitter) · Tap any account above to switch feeds
+      </div>
+    </div>
+  );
+}
+
 // ─── Course Tab ───────────────────────────────────────────────────────────────
 function CourseTab({ tournament }: { tournament: Tournament }) {
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -1893,15 +2184,20 @@ export default function Page() {
 
       {/* Tab nav */}
       <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "0 24px", display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
-        {(["picks", "leaderboard", "history", "course"] as Tab[]).map((t) => (
+        {(["picks", "leaderboard", "tournament", "history", "course", "newsroom"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
-            padding: "13px 22px", fontSize: 15, background: "transparent", border: "none",
+            padding: "13px 18px", fontSize: 14, background: "transparent", border: "none",
             borderBottom: tab === t ? `2px solid ${th.accent}` : "2px solid transparent",
             color: tab === t ? th.accent : th.creamDim,
             cursor: "pointer", fontFamily: "Playfair Display, serif",
-            fontWeight: tab === t ? 600 : 400, transition: "all 0.2s",
+            fontWeight: tab === t ? 600 : 400, transition: "all 0.2s", whiteSpace: "nowrap" as const,
           }}>
-            {t === "picks" ? "My Picks" : t === "leaderboard" ? "Leaderboard" : t === "history" ? "History" : "Course Guide"}
+            {t === "picks" ? "My Picks"
+              : t === "leaderboard" ? "Pick'em Leaderboard"
+              : t === "tournament" ? "⛳ Tournament"
+              : t === "history" ? "History"
+              : t === "course" ? "Course Guide"
+              : "📡 Newsroom"}
           </button>
         ))}
       </div>
@@ -1914,11 +2210,17 @@ export default function Page() {
         {tab === "leaderboard" && (
           <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} />
         )}
+        {tab === "tournament" && (
+          <TournamentLeaderboardTab scores={scores} />
+        )}
         {tab === "history" && (
           <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />
         )}
         {tab === "course" && (
           <CourseTab tournament={tournament} />
+        )}
+        {tab === "newsroom" && (
+          <NewsroomTab />
         )}
       </main>
     </div>
