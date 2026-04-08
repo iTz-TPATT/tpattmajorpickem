@@ -968,124 +968,196 @@ function LeaderboardTab({
     );
   }
 
+  // Masters-style score color: red = under par, black/white = even, gray = over
+  function mastersColor(score: number | null) {
+    if (score === null) return "#999";
+    if (score < 0) return "#c0392b";   // Masters red for under par
+    if (score === 0) return "#e8dcc8"; // cream for even
+    return "#888";                      // gray for over par
+  }
+
+  function mastersScore(score: number | null) {
+    if (score === null) return "-";
+    if (score === 0) return "E";
+    return score > 0 ? `+${score}` : `${score}`;
+  }
+
+  const latestRound = standings.length > 0
+    ? Math.max(...standings.flatMap(u => Object.keys(u.rounds).map(Number)), 0)
+    : 0;
+
   return (
-    <div>
-      {/* Purse */}
-      <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 12, color: "var(--cream-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Total Purse</div>
-          <div style={{ fontSize: 28, color: "var(--accent)", fontFamily: "Playfair Display, serif" }}>${purse.toLocaleString()}</div>
+    <div style={{ fontFamily: "'EB Garamond', serif" }}>
+
+      {/* Masters-style header bar */}
+      <div style={{
+        background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
+        border: "1px solid #2d6b40",
+        borderRadius: "10px 10px 0 0",
+        padding: "10px 0 0",
+        marginBottom: 0,
+      }}>
+        {/* Purse row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px 10px" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.12em", textTransform: "uppercase" as const }}>Pool Purse</div>
+            <div style={{ fontSize: 22, color: "#c9a84c", fontFamily: "Playfair Display, serif", fontWeight: 600 }}>${purse.toLocaleString()}</div>
+          </div>
+          <div style={{ textAlign: "right" as const }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{playerCount} players · $50 buy-in</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2, fontStyle: "italic" }}>Lowest cumulative score wins</div>
+          </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 12, color: "var(--cream-dim)", marginBottom: 4 }}>{playerCount} players × $50</div>
-          <div style={{ fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic" }}>Lowest combined score wins</div>
+
+        {/* Column headers — Masters scoreboard style */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "42px 42px 1fr 52px 52px 52px 52px 64px",
+          alignItems: "center",
+          padding: "6px 16px",
+          background: "rgba(0,0,0,0.25)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+        }}>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textAlign: "center" as const }}>POS</div>
+          <div />
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em" }}>PLAYER</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.06em", textAlign: "center" as const }}>R1</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.06em", textAlign: "center" as const }}>R2</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.06em", textAlign: "center" as const }}>R3</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.06em", textAlign: "center" as const }}>R4</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.06em", textAlign: "center" as const }}>TOTAL</div>
         </div>
       </div>
 
-      {/* Standings */}
-      {standings.map((u, i) => {
-        const isOpen = expanded === u.uid;
-        const roundsPlayed = Object.keys(u.rounds).length;
+      {/* Standings rows */}
+      <div style={{ border: "1px solid #2d6b40", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden", marginBottom: 16 }}>
+        {standings.map((u, i) => {
+          const isOpen = expanded === u.uid;
+          const isLeader = i === 0;
+          const isTied = i > 0 && u.total === standings[i - 1].total;
+          const posLabel = isTied ? `T${i + 1}` : `${i + 1}`;
 
-        return (
-          <div key={u.uid} style={{ ...card, padding: 0, overflow: "hidden" }}>
-            {/* Main row */}
-            <button
-              onClick={() => setExpanded(isOpen ? null : u.uid)}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
-                background: i === 0 ? "rgba(201,168,76,0.06)" : "transparent",
-                border: "none", cursor: "pointer", textAlign: "left",
-              }}
-            >
-              {/* Rank */}
-              <div style={{
-                width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: i === 0 ? "var(--accent)" : "rgba(255,255,255,0.08)",
-                color: i === 0 ? "var(--bg)" : "var(--cream-dim)",
-                fontSize: 13, fontWeight: 700,
-              }}>{i + 1}</div>
+          return (
+            <div key={u.uid} style={{ borderBottom: i < standings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+              {/* Main row */}
+              <button
+                onClick={() => setExpanded(isOpen ? null : u.uid)}
+                style={{
+                  width: "100%",
+                  display: "grid",
+                  gridTemplateColumns: "42px 42px 1fr 52px 52px 52px 52px 64px",
+                  alignItems: "center",
+                  padding: "11px 16px",
+                  background: isLeader
+                    ? "linear-gradient(90deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.04) 100%)"
+                    : i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
+                  border: "none", cursor: "pointer", textAlign: "left" as const,
+                  transition: "background 0.15s",
+                }}
+              >
+                {/* Position */}
+                <div style={{
+                  fontSize: 14, fontWeight: 700, textAlign: "center" as const,
+                  color: isLeader ? "#c9a84c" : "rgba(255,255,255,0.5)",
+                  fontFamily: "monospace",
+                }}>{posLabel}</div>
 
-              <PlayerAvatar username={u.username} size={36} />
-
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>{u.username}</div>
-                {/* Round-by-round score pills */}
-                <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" as const }}>
-                  {Object.entries(u.rounds).map(([r, rd]) => (
-                    <span key={r} style={{
-                      fontSize: 11, padding: "1px 7px", borderRadius: 8,
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      color: scoreColor(rd.score), fontFamily: "monospace",
-                    }}>
-                      R{r} {fmtScore(rd.score)}
-                    </span>
-                  ))}
+                {/* Avatar */}
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                  <PlayerAvatar username={u.username} size={30} />
                 </div>
-              </div>
 
-              {/* Scores block */}
-              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                {/* Current round score */}
-                {roundsPlayed > 0 && (() => {
-                  const latestRound = Math.max(...Object.keys(u.rounds).map(Number));
-                  const latestScore = u.rounds[latestRound]?.score;
-                  return (
-                    <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>
-                      R{latestRound}: <span style={{ color: scoreColor(latestScore), fontFamily: "monospace" }}>{fmtScore(latestScore)}</span>
-                    </div>
-                  );
-                })()}
-                {/* Cumulative total */}
-                <div style={{ fontSize: 22, fontFamily: "monospace", color: scoreColor(u.total), fontWeight: 700, lineHeight: 1 }}>
-                  {fmtScore(u.total)}
+                {/* Name */}
+                <div style={{ paddingLeft: 8 }}>
+                  <div style={{
+                    fontSize: 15, fontWeight: isLeader ? 600 : 400,
+                    color: isLeader ? "#c9a84c" : "#e8dcc8",
+                    fontFamily: "Playfair Display, serif",
+                    whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{u.username}</div>
+                  {/* Round pills on mobile */}
+                  {isOpen && (
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>tap to collapse</div>
+                  )}
                 </div>
-                <div style={{ fontSize: 10, color: "var(--cream-dim)", letterSpacing: "0.06em" }}>TOTAL</div>
-              </div>
 
-              <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>{isOpen ? "▲" : "▼"}</div>
-            </button>
+                {/* R1 */}
+                <div style={{ textAlign: "center" as const, fontFamily: "monospace", fontSize: 14, fontWeight: 600, color: mastersColor(u.rounds[1]?.score ?? null) }}>
+                  {u.rounds[1] ? mastersScore(u.rounds[1].score) : <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>}
+                </div>
+                {/* R2 */}
+                <div style={{ textAlign: "center" as const, fontFamily: "monospace", fontSize: 14, fontWeight: 600, color: mastersColor(u.rounds[2]?.score ?? null) }}>
+                  {u.rounds[2] ? mastersScore(u.rounds[2].score) : <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>}
+                </div>
+                {/* R3 */}
+                <div style={{ textAlign: "center" as const, fontFamily: "monospace", fontSize: 14, fontWeight: 600, color: mastersColor(u.rounds[3]?.score ?? null) }}>
+                  {u.rounds[3] ? mastersScore(u.rounds[3].score) : <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>}
+                </div>
+                {/* R4 */}
+                <div style={{ textAlign: "center" as const, fontFamily: "monospace", fontSize: 14, fontWeight: 600, color: mastersColor(u.rounds[4]?.score ?? null) }}>
+                  {u.rounds[4] ? mastersScore(u.rounds[4].score) : <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>}
+                </div>
+                {/* Total */}
+                <div style={{
+                  textAlign: "center" as const, fontFamily: "monospace", fontSize: 17, fontWeight: 700,
+                  color: mastersColor(u.total),
+                  background: isLeader ? "rgba(192,57,43,0.12)" : "transparent",
+                  borderRadius: 4, padding: "2px 4px",
+                }}>
+                  {mastersScore(u.total)}
+                </div>
+              </button>
 
-            {/* Expanded round breakdown */}
-            {isOpen && (
-              <div style={{ borderTop: "1px solid var(--card-border)", padding: "14px 18px 18px" }}>
-                {Object.entries(u.rounds).map(([r, rd]) => {
-                  const rNum = parseInt(r);
-                  const roundScores = rd.picks.map((g) => getRoundScore(scoreMap[g], rNum));
+              {/* Expanded detail */}
+              {isOpen && (
+                <div style={{ background: "rgba(0,0,0,0.3)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "12px 16px 16px" }}>
+                  {Object.entries(u.rounds).map(([r, rd]) => {
+                    const rNum = parseInt(r);
+                    const roundScores = rd.picks.map((g) => getRoundScore(scoreMap[g], rNum));
+                    const maxScore = Math.max(...roundScores.map((s) => s ?? -999));
 
-                  return (
-                    <div key={r} style={{ marginBottom: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600 }}>
-                          {ROUND_LABELS[rNum]} {rNum <= 2 ? "(best 2)" : "(all 3)"}
-                        </span>
-                        <span style={{ fontFamily: "monospace", fontSize: 14, color: scoreColor(rd.score) }}>{fmtScore(rd.score)}</span>
+                    return (
+                      <div key={r} style={{ marginBottom: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: "#c9a84c", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
+                            {ROUND_LABELS[rNum]} · {rNum <= 2 ? "Best 2 of 3" : "All 3 count"}
+                          </span>
+                          <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: mastersColor(rd.score) }}>{mastersScore(rd.score)}</span>
+                        </div>
+                        {rd.picks.map((g, pi) => {
+                          const rs = roundScores[pi];
+                          const notCounted = rNum <= 2 && rs === maxScore && rd.picks.length === 3;
+                          return (
+                            <div key={g} style={{
+                              display: "flex", justifyContent: "space-between", alignItems: "center",
+                              fontSize: 13, padding: "5px 10px",
+                              background: notCounted ? "transparent" : "rgba(255,255,255,0.03)",
+                              borderRadius: 4, marginBottom: 3,
+                              opacity: notCounted ? 0.45 : 1,
+                            }}>
+                              <span style={{ color: "#e8dcc8", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                {notCounted && <span style={{ fontSize: 10, color: "#888", letterSpacing: "0.06em" }}>NOT COUNTED</span>}
+                                <span style={{ fontFamily: "monospace", fontWeight: 600, color: mastersColor(rs) }}>{mastersScore(rs)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      {rd.picks.map((g, pi) => {
-                        const rs = roundScores[pi];
-                        const maxScore = Math.max(...roundScores.map((s) => s ?? -999));
-                        const notCounted = rNum <= 2 && rs === maxScore && rd.picks.length === 3;
-                        return (
-                          <div key={g} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 8px", background: "rgba(255,255,255,0.02)", borderRadius: 4, marginBottom: 3 }}>
-                            <span style={{ color: notCounted ? "var(--cream-dim)" : "var(--cream)", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
-                            <span style={{ fontFamily: "monospace", color: scoreColor(rs), opacity: notCounted ? 0.5 : 1 }}>{fmtScore(rs)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      <p style={{ textAlign: "center", fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic", marginTop: 8 }}>
-        {standings.length > 1 && standings[0].total === standings[1].total ? "⚖️ Tied — purse splits equally" : ""}
-      </p>
+      {standings.length > 1 && standings[0].total === standings[1].total && (
+        <p style={{ textAlign: "center", fontSize: 13, color: "var(--cream-dim)", fontStyle: "italic", marginTop: -8, marginBottom: 16 }}>
+          ⚖️ Tied — purse splits equally
+        </p>
+      )}
     </div>
   );
 }
