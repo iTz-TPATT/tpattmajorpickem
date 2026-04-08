@@ -1421,28 +1421,32 @@ const TOURNAMENT_DAYS: Record<string, { round: string; title: string; subtitle: 
 // ─── Masters Splash Screen ────────────────────────────────────────────────────
 function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: string }) {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
+  const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Try to play Masters theme from a CDN-hosted source
-    try {
-      const audio = new Audio("https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg");
-      audio.volume = 0.35;
-      audio.play().catch(() => {}); // silently fail if autoplay blocked
-      audioRef.current = audio;
-    } catch {}
+    const audio = new Audio("https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg");
+    audio.volume = 0.4;
+    audio.loop = true;
+    audioRef.current = audio;
 
     const t1 = setTimeout(() => setPhase("hold"), 600);
-    const t2 = setTimeout(() => setPhase("out"), 3600);
+    const t2 = setTimeout(() => setPhase("out"), 5500);
     const t3 = setTimeout(() => {
       onDone();
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    }, 4400);
+    }, 6300);
     return () => {
       clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
   }, [onDone]);
+
+  function handleUnmute() {
+    if (!audioRef.current) return;
+    audioRef.current.play().catch(() => {});
+    setMuted(false);
+  }
 
   return (
     <div style={{
@@ -1469,9 +1473,7 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
       }} />
       {/* Content */}
       <div style={{ position: "relative", textAlign: "center" as const, padding: "0 32px", maxWidth: 500 }}>
-        {/* Azalea icon */}
         <div style={{ fontSize: 48, marginBottom: 24, filter: "drop-shadow(0 0 20px rgba(201,168,76,0.4))" }}>🌿</div>
-        {/* Augusta tagline */}
         <div style={{
           fontFamily: "Playfair Display, EB Garamond, serif",
           fontSize: 28, fontWeight: 400, letterSpacing: "0.04em",
@@ -1480,7 +1482,6 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
         }}>
           A Tradition Unlike Any Other
         </div>
-        {/* Tournament name */}
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
           color: "rgba(240,233,214,0.7)", letterSpacing: "0.18em",
@@ -1488,9 +1489,7 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
         }}>
           The Masters Tournament · 2026
         </div>
-        {/* Divider */}
         <div style={{ width: 60, height: 1, background: "rgba(201,168,76,0.4)", margin: "0 auto 32px" }} />
-        {/* Sponsor */}
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 12,
           color: "rgba(255,255,255,0.35)", letterSpacing: "0.14em",
@@ -1501,10 +1500,31 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
         <div style={{
           fontFamily: "Playfair Display, EB Garamond, serif",
           fontSize: 20, fontWeight: 600, color: "rgba(240,233,214,0.9)",
-          letterSpacing: "0.06em",
+          letterSpacing: "0.06em", marginBottom: 32,
         }}>
           Patterson Inc.
         </div>
+        {/* Tap to unmute button */}
+        <button
+          onClick={handleUnmute}
+          style={{
+            background: muted ? "rgba(201,168,76,0.12)" : "rgba(93,186,126,0.15)",
+            border: `1px solid ${muted ? "rgba(201,168,76,0.35)" : "rgba(93,186,126,0.4)"}`,
+            borderRadius: 30, padding: "8px 20px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 8,
+            margin: "0 auto",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <span style={{ fontSize: 16 }}>{muted ? "🔇" : "🔊"}</span>
+          <span style={{
+            fontFamily: "EB Garamond, serif", fontSize: 13,
+            color: muted ? "rgba(201,168,76,0.8)" : "rgba(93,186,126,0.9)",
+            letterSpacing: "0.08em",
+          }}>
+            {muted ? "Tap to unmute" : "Playing..."}
+          </span>
+        </button>
       </div>
     </div>
   );
