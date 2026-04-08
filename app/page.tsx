@@ -222,7 +222,7 @@ function RadarChart({ data, accent }: {
   }
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} overflow="visible" style={{ overflow: "visible" }}>
+    <svg width={150} height={150} viewBox={`0 0 ${size} ${size}`} overflow="visible" style={{ overflow: "visible" }}>
       {/* Grid rings */}
       {rings.map((r, i) => (
         <circle key={i} cx={cx} cy={cy} r={r}
@@ -290,7 +290,7 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
       position: "absolute", bottom: "110%", left: "50%", transform: "translateX(-50%)",
       background: "var(--bg-dark)", border: "1px solid var(--card-border)",
       borderRadius: 10, padding: "12px 14px", zIndex: 100,
-      minWidth: radarData ? 310 : 200, maxWidth: 360,
+      minWidth: radarData ? 340 : 200, maxWidth: 420,
       boxShadow: "0 8px 32px rgba(0,0,0,0.7)", pointerEvents: "none",
     }}>
       {!stats ? (
@@ -301,7 +301,7 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
           {/* Radar chart */}
           {radarData && (
-            <div style={{ flexShrink: 0, padding: "0 20px" }}>
+            <div style={{ flexShrink: 0 }}>
               <div style={{ fontSize: 9, color: "var(--accent)", letterSpacing: "0.1em", textAlign: "center", marginBottom: 4, textTransform: "uppercase" }}>
                 Skill Profile
               </div>
@@ -1426,34 +1426,19 @@ const TOURNAMENT_DAYS: Record<string, { round: string; title: string; subtitle: 
 };
 
 // ─── Masters Splash Screen ────────────────────────────────────────────────────
-function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: string }) {
+function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
+  onDone: () => void; bgImage?: string;
+  audioRef: React.MutableRefObject<HTMLAudioElement | null>;
+  muted: boolean; onUnmute: () => void;
+}) {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
-  const [muted, setMuted] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const audio = new Audio("https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg");
-    audio.volume = 0.4;
-    audio.loop = true;
-    audioRef.current = audio;
-
     const t1 = setTimeout(() => setPhase("hold"), 600);
     const t2 = setTimeout(() => setPhase("out"), 6000);
-    const t3 = setTimeout(() => {
-      onDone();
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    }, 6800);
-    return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    };
+    const t3 = setTimeout(() => onDone(), 6800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onDone]);
-
-  function handleUnmute() {
-    if (!audioRef.current) return;
-    audioRef.current.play().catch(() => {});
-    setMuted(false);
-  }
 
   return (
     <div style={{
@@ -1464,7 +1449,6 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
       transition: phase === "in" ? "opacity 600ms ease" : "opacity 800ms ease",
       overflow: "hidden",
     }}>
-      {/* Background image */}
       {bgImage && (
         <div style={{
           position: "absolute", inset: 0,
@@ -1473,12 +1457,10 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
           opacity: 0.45, filter: "none",
         }} />
       )}
-      {/* Green gradient overlay */}
       <div style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(135deg, rgba(7,21,16,0.92) 0%, rgba(15,35,24,0.85) 50%, rgba(7,21,16,0.92) 100%)",
       }} />
-      {/* Content */}
       <div style={{ position: "relative", textAlign: "center" as const, padding: "0 32px", maxWidth: 500 }}>
         <div style={{ fontSize: 48, marginBottom: 24, filter: "drop-shadow(0 0 20px rgba(201,168,76,0.4))" }}>🌿</div>
         <div style={{
@@ -1511,15 +1493,13 @@ function MastersSplash({ onDone, bgImage }: { onDone: () => void; bgImage?: stri
         }}>
           Patterson Inc.
         </div>
-        {/* Tap to unmute button */}
         <button
-          onClick={handleUnmute}
+          onClick={onUnmute}
           style={{
             background: muted ? "rgba(201,168,76,0.12)" : "rgba(93,186,126,0.15)",
             border: `1px solid ${muted ? "rgba(201,168,76,0.35)" : "rgba(93,186,126,0.4)"}`,
             borderRadius: 30, padding: "8px 20px", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 8,
-            margin: "0 auto",
+            display: "flex", alignItems: "center", gap: 8, margin: "0 auto",
             transition: "all 0.3s ease",
           }}
         >
@@ -1755,6 +1735,34 @@ export default function Page() {
   const [playerCount, setPlayerCount] = useState(0);
   const [showSplash, setShowSplash] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(true);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize audio once
+  useEffect(() => {
+    const audio = new Audio("https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg");
+    audio.volume = 0.35;
+    audio.loop = true;
+    musicRef.current = audio;
+    return () => { audio.pause(); };
+  }, []);
+
+  function handleUnmute() {
+    if (!musicRef.current) return;
+    musicRef.current.play().catch(() => {});
+    setMusicMuted(false);
+  }
+
+  function handleMuteToggle() {
+    if (!musicRef.current) return;
+    if (musicMuted) {
+      musicRef.current.play().catch(() => {});
+      setMusicMuted(false);
+    } else {
+      musicRef.current.pause();
+      setMusicMuted(true);
+    }
+  }
   const tournament = getActiveTournament();
   const th = tournament.theme;
 
@@ -1815,6 +1823,7 @@ export default function Page() {
     ["mp_token", "mp_username", "mp_userId"].forEach((k) => localStorage.removeItem(k));
     setToken(null); setUsername(null); setUserId(null);
     setPicks([]); setScores([]);
+    if (musicRef.current) { musicRef.current.pause(); setMusicMuted(true); }
   }
 
   if (!hydrated) return null;
@@ -1823,11 +1832,13 @@ export default function Page() {
   return (
     <div style={{ minHeight: "100vh", background: th.bg, color: th.cream, fontFamily: "EB Garamond, serif", paddingBottom: 80, ...themeVars(tournament) }}>
       {showSplash && !splashDone && (
-        <MastersSplash onDone={() => {
-          setSplashDone(true);
-          setShowSplash(false);
-          sessionStorage.setItem("mp_splash_shown", "1");
-        }} bgImage="/splash-bg.jpg" />
+        <MastersSplash
+          onDone={() => { setSplashDone(true); setShowSplash(false); sessionStorage.setItem("mp_splash_shown", "1"); }}
+          bgImage="/splash-bg.jpg"
+          audioRef={musicRef}
+          muted={musicMuted}
+          onUnmute={handleUnmute}
+        />
       )}
       <RoundLeaderBanner picks={picks} scores={scores} registeredUsers={registeredUsers} />
       <TournamentDayBanner />
@@ -1843,6 +1854,12 @@ export default function Page() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <PlayerAvatar username={username} size={28} />
           <span style={{ fontSize: 14, color: th.creamDim, fontStyle: "italic" }}>{username}</span>
+          <button onClick={handleMuteToggle} title={musicMuted ? "Unmute music" : "Mute music"} style={{
+            background: "transparent", border: `1px solid ${th.cardBorder}`,
+            color: th.creamDim, padding: "6px 10px", borderRadius: 6, fontSize: 15, cursor: "pointer",
+          }}>
+            {musicMuted ? "🔇" : "🔊"}
+          </button>
           <button onClick={handleLogout} style={{ background: "transparent", border: `1px solid ${th.cardBorder}`, color: th.creamDim, padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
             Sign out
           </button>
