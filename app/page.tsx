@@ -595,7 +595,7 @@ function CourseHero({ tournament, splashDone }: { tournament: Tournament; splash
   }, [tournament.id]);
 
   // Start rotation timer once photos are loaded and visible
-  const startTimer = useCallback(() => {
+  const startTimer = useCallback((delay = DISPLAY_MS) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       // Fade out
@@ -605,13 +605,16 @@ function CourseHero({ tournament, splashDone }: { tournament: Tournament; splash
         setIdx(prev => (prev + 1) % photos.length);
         setTimeout(() => setOpacity(1), 50);
       }, FADE_MS);
-    }, DISPLAY_MS);
+    }, delay);
   }, [photos.length]);
 
   // Only start rotating after splash is done
   useEffect(() => {
     if (photos.length > 1 && splashDone && !rotationStarted.current) {
       rotationStarted.current = true;
+      // First photo gets 5 extra seconds so it's still showing when splash fades
+      startTimer(DISPLAY_MS + 5000);
+    } else if (photos.length > 1 && splashDone && rotationStarted.current && idx > 0) {
       startTimer();
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -1838,6 +1841,77 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 }
 
 // ─── Round Leader Banner ──────────────────────────────────────────────────────
+// ─── Score Ticker ─────────────────────────────────────────────────────────────
+function ScoreTicker({ scores }: { scores: GolferScore[] }) {
+  if (!scores.length) return null;
+
+  // Sort by total score, take top 30 active players
+  const sorted = [...scores]
+    .filter(s => s.status === "active")
+    .sort((a, b) => a.totalScore - b.totalScore)
+    .slice(0, 30);
+
+  if (!sorted.length) return null;
+
+  function fmtScore(s: number) {
+    if (s === 0) return "E";
+    return s > 0 ? `+${s}` : `${s}`;
+  }
+
+  function scoreColor(s: number) {
+    if (s < 0) return "#c0392b";
+    if (s === 0) return "rgba(255,255,255,0.7)";
+    return "rgba(255,255,255,0.4)";
+  }
+
+  // Build one copy of items, then duplicate for seamless loop
+  const items = sorted.map((p, i) => (
+    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "0 18px", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+      {/* Position */}
+      <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace", minWidth: 16 }}>{i + 1}</span>
+      {/* Name */}
+      <span style={{ fontSize: 12, color: "rgba(240,233,214,0.9)", letterSpacing: "0.02em" }}>
+        {p.name.split(" ").slice(-1)[0]}{/* Last name only */}
+        {p.name.split(" ").length > 1 && (
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>, {p.name.split(" ")[0][0]}.</span>
+        )}
+      </span>
+      {/* Score */}
+      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: scoreColor(p.totalScore) }}>
+        {fmtScore(p.totalScore)}
+      </span>
+      {/* Thru indicator if in progress */}
+      {(p.r1 !== null && p.r2 === null) && (
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>R1</span>
+      )}
+    </span>
+  ));
+
+  return (
+    <div className="ticker-wrap" style={{ padding: "5px 0" }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        {/* Label */}
+        <div style={{
+          flexShrink: 0, padding: "0 12px", borderRight: "1px solid rgba(201,168,76,0.3)",
+          fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+          color: "#c9a84c", background: "#061210", zIndex: 1,
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <span>⛳</span>
+          <span>LIVE</span>
+        </div>
+        {/* Scrolling track — duplicated for seamless loop */}
+        <div style={{ overflow: "hidden", flex: 1 }}>
+          <div className="ticker-track">
+            <span>{items}</span>
+            <span>{items}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RoundLeaderBanner({ picks, scores, registeredUsers }: {
   picks: Pick[]; scores: GolferScore[]; registeredUsers: { id: string; username: string }[];
 }) {
@@ -2054,7 +2128,7 @@ export default function Page() {
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const [showSplash, setShowSplash] = useState(false);
-  const [splashDone, setSplashDone] = useState(() => !!sessionStorage.getItem("mp_splash_shown"));
+  const [splashDone, setSplashDone] = useState(() => typeof window !== "undefined" && !!sessionStorage.getItem("mp_splash_shown"));
   const [musicMuted, setMusicMuted] = useState(true);
   const musicRef = useRef<HTMLAudioElement | null>(null);
 
@@ -2222,6 +2296,9 @@ export default function Page() {
           </button>
         ))}
       </div>
+
+      {/* Score ticker */}
+      <ScoreTicker scores={scores} />
 
       {/* Content */}
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>

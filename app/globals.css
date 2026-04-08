@@ -116,3 +116,22 @@ img { max-width: 100%; height: auto; }
   .tlb-grid-header > div,
   .tlb-grid-row > div { font-size: 10px !important; }
 }
+
+/* ── Score Ticker ─────────────────────────────────────────── */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-track {
+  display: flex;
+  white-space: nowrap;
+  animation: ticker-scroll 45s linear infinite;
+  will-change: transform;
+}
+.ticker-track:hover { animation-play-state: paused; }
+.ticker-wrap {
+  overflow: hidden;
+  width: 100%;
+  background: #061210;
+  border-bottom: 1px solid rgba(201,168,76,0.2);
+}
