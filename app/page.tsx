@@ -1035,7 +1035,7 @@ function LeaderboardTab({
         {/* Column headers — Masters scoreboard style */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "42px 42px 1fr 52px 52px 52px 52px 64px",
+          gridTemplateColumns: "36px 36px 1fr 44px 44px 44px 44px 56px",
           alignItems: "center",
           padding: "6px 16px",
           background: "rgba(0,0,0,0.25)",
@@ -1068,7 +1068,7 @@ function LeaderboardTab({
                 style={{
                   width: "100%",
                   display: "grid",
-                  gridTemplateColumns: "42px 42px 1fr 52px 52px 52px 52px 64px",
+                  gridTemplateColumns: "36px 36px 1fr 44px 44px 44px 44px 56px",
                   alignItems: "center",
                   padding: "11px 16px",
                   background: isLeader
@@ -1435,8 +1435,8 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("hold"), 600);
-    const t2 = setTimeout(() => setPhase("out"), 10000);
-    const t3 = setTimeout(() => onDone(), 10800);
+    const t2 = setTimeout(() => setPhase("out"), 8000);
+    const t3 = setTimeout(() => onDone(), 8800);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onDone]);
 
@@ -1454,7 +1454,7 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
           position: "absolute", inset: 0,
           backgroundImage: `url(${bgImage})`,
           backgroundSize: "cover", backgroundPosition: "right center",
-          opacity: 0.72, filter: "none",
+          opacity: 0.80, filter: "none",
         }} />
       )}
       <div style={{
@@ -1462,11 +1462,11 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
         background: "linear-gradient(135deg, rgba(7,21,16,0.92) 0%, rgba(15,35,24,0.85) 50%, rgba(7,21,16,0.92) 100%)",
       }} />
       <div style={{ position: "relative", textAlign: "center" as const, padding: "0 32px", maxWidth: 500 }}>
-        <div style={{ fontSize: 48, marginBottom: 24, filter: "drop-shadow(0 0 20px rgba(201,168,76,0.4))" }}>🌿</div>
+        <div style={{ marginBottom: 24, display: "flex", justifyContent: "center", filter: "drop-shadow(0 0 20px rgba(201,168,76,0.5))" }}><TexasIcon size={64} color="#c9a84c" /></div>
         <div style={{
           fontFamily: "Playfair Display, EB Garamond, serif",
           fontSize: 28, fontWeight: 400, letterSpacing: "0.04em",
-          color: "#c9a84c", lineHeight: 1.3, marginBottom: 8,
+          color: "#c9a84c", lineHeight: 1.3, marginBottom: 12,
           textShadow: "0 2px 20px rgba(201,168,76,0.3)",
         }}>
           A Tradition Unlike Any Other
@@ -1474,9 +1474,17 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
           color: "rgba(240,233,214,0.7)", letterSpacing: "0.18em",
-          textTransform: "uppercase" as const, marginBottom: 40,
+          textTransform: "uppercase" as const, marginBottom: 6,
         }}>
-          The Masters Tournament · 2026
+          The Masters Tournament
+        </div>
+        <div style={{
+          fontFamily: "EB Garamond, serif", fontSize: 15,
+          color: "rgba(240,233,214,0.5)", letterSpacing: "0.22em",
+          textTransform: "uppercase" as const, marginBottom: 40,
+          textAlign: "center" as const,
+        }}>
+          2026
         </div>
         <div style={{ width: 60, height: 1, background: "rgba(201,168,76,0.4)", margin: "0 auto 32px" }} />
         <div style={{
@@ -1742,9 +1750,7 @@ export default function Page() {
   useEffect(() => {
     // Try multiple sources in order
     const sources = [
-      "https://www.televisiontunes.com/uploads/audio/CBS%20-%20Masters%20Golf%20Tournament.mp3",
-      "https://archive.org/download/tvtunes_7756/CBS%20-%20Masters%20Golf%20Tournament.mp3",
-      "https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg",
+      "/masters-theme.mp3",
     ];
     const audio = new Audio();
     audio.volume = 0.35;
