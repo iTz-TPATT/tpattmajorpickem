@@ -5,9 +5,13 @@ import { NextResponse } from "next/server";
 
 const PHOTOS: Record<string, { file: string; caption: string }[]> = {
   masters: [
-    { file: "masters-logo.jpg",        caption: "The Azaleas · Augusta National Golf Club" },
-    { file: "masters-pond.jpg",        caption: "Amen Corner · Augusta National" },
-    { file: "masters-leaderboard.jpg", caption: "Augusta National Golf Club · Augusta, Georgia" },
+    { file: "masters-logo.jpg",       caption: "The Azaleas · Augusta National Golf Club" },
+    { file: "pimento-sandwich.jpg",   caption: "Pimento Cheese Sandwich & Sweet Tea · Augusta National" },
+    { file: "rory-mcilroy.jpg",       caption: "Rory McIlroy — 2025 Masters Champion · Augusta National" },
+    { file: "tiger-woods.jpg",        caption: "Tiger Woods — Augusta National" },
+    { file: "par-3.jpg",              caption: "Amen Corner · Augusta National Golf Club" },
+    { file: "masters-pond.jpg",       caption: "Augusta National Golf Club · Augusta, Georgia" },
+    { file: "masters-leaderboard.jpg", caption: "The Leaderboard · Augusta National" },
   ],
   // ── Future majors — upload photos and uncomment ──────────────────────────
   // pga: [
