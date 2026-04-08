@@ -857,7 +857,7 @@ function MyPicksTab({
             <p style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 12 }}>
               Pick 3 golfers. Hover for season stats. Grayed = already used or cut.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
               {sortedGolfers.map((gs) => (
                 <GolferCard
                   key={gs.name}
@@ -1035,9 +1035,9 @@ function LeaderboardTab({
         {/* Column headers — Masters scoreboard style */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "36px 36px 1fr 44px 44px 44px 44px 56px",
+          gridTemplateColumns: "min(30px,8vw) min(30px,8vw) 1fr min(40px,11vw) min(40px,11vw) min(40px,11vw) min(40px,11vw) min(52px,14vw)",
           alignItems: "center",
-          padding: "6px 16px",
+          padding: "6px 10px",
           background: "rgba(0,0,0,0.25)",
           borderTop: "1px solid rgba(255,255,255,0.08)",
         }}>
@@ -1068,9 +1068,9 @@ function LeaderboardTab({
                 style={{
                   width: "100%",
                   display: "grid",
-                  gridTemplateColumns: "36px 36px 1fr 44px 44px 44px 44px 56px",
+                  gridTemplateColumns: "min(30px,8vw) min(30px,8vw) 1fr min(40px,11vw) min(40px,11vw) min(40px,11vw) min(40px,11vw) min(52px,14vw)",
                   alignItems: "center",
-                  padding: "11px 16px",
+                  padding: "11px 10px",
                   background: isLeader
                     ? "linear-gradient(90deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.04) 100%)"
                     : i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
@@ -1094,10 +1094,10 @@ function LeaderboardTab({
                 <div style={{ paddingLeft: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{
-                      fontSize: 15, fontWeight: isLeader ? 600 : 400,
+                      fontSize: 14, fontWeight: isLeader ? 600 : 400,
                       color: isLeader ? "#c9a84c" : "#e8dcc8",
                       fontFamily: "Playfair Display, serif",
-                      whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis",
+                      overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2,
                     }}>{u.username}</div>
                     {/* Round pick status badges — show status for each active round */}
                     {currentRound <= 4 && (() => {
@@ -1350,8 +1350,8 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
       <div style={{
         background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
         border: "1px solid #2d6b40", borderRadius: "10px 10px 0 0",
-        display: "grid", gridTemplateColumns: "42px 1fr 48px 48px 48px 48px 64px",
-        padding: "8px 16px", gap: 4,
+        display: "grid", gridTemplateColumns: "min(38px,10vw) 1fr min(40px,11vw) min(40px,11vw) min(40px,11vw) min(40px,11vw) min(54px,14vw)",
+        padding: "8px 10px", gap: 2,
       }}>
         {["POS","PLAYER","R1","R2","R3","R4","TOTAL"].map(h => (
           <div key={h} style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textAlign: h === "PLAYER" ? "left" as const : "center" as const }}>{h}</div>
@@ -1393,7 +1393,7 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
                   <div style={{ overflow: "hidden" }}>
                     <div style={{ fontSize: 14, fontWeight: isLeader ? 600 : 400,
                       color: isLeader ? "#c9a84c" : "#e8dcc8", fontFamily: "Playfair Display, serif",
-                      whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>
                       {p.name}
                     </div>
                     
@@ -1449,167 +1449,166 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
 
 // ─── Newsroom Tab ─────────────────────────────────────────────────────────────
 const NEWSROOM_ACCOUNTS = [
-  { handle: "TheMasters",    label: "The Masters",     emoji: "🌿", desc: "Official updates, scores & highlights" },
-  { handle: "PGATOUR",       label: "PGA Tour",        emoji: "⛳", desc: "News, quotes & player insights" },
-  { handle: "ForePlayPod",   label: "Fore Play",       emoji: "🎙️", desc: "Barstool golf entertainment" },
-  { handle: "SI_Golf",       label: "Sports Illustrated Golf", emoji: "📰", desc: "Expert commentary & live news" },
-  { handle: "GolfDigest",    label: "Golf Digest",     emoji: "📋", desc: "Analysis & weekend coverage" },
-  { handle: "TourPicks",     label: "Tour Picks",      emoji: "🎯", desc: "Weekly golf betting previews" },
-  { handle: "ReadTheLine_",  label: "Read The Line",   emoji: "📊", desc: "In-depth golf betting analysis" },
+  { handle: "TheMasters",   label: "The Masters",    emoji: "🌿", desc: "Official updates" },
+  { handle: "PGATOUR",      label: "PGA Tour",       emoji: "⛳", desc: "Tour news & quotes" },
+  { handle: "ForePlayPod",  label: "Fore Play",      emoji: "🎙️", desc: "Barstool golf" },
+  { handle: "SI_Golf",      label: "SI Golf",        emoji: "📰", desc: "Expert commentary" },
+  { handle: "GolfDigest",   label: "Golf Digest",    emoji: "📋", desc: "Golf news & analysis" },
+  { handle: "TourPicks",    label: "Tour Picks",     emoji: "🎯", desc: "Betting previews" },
+  { handle: "ReadTheLine_", label: "Read The Line",  emoji: "📊", desc: "Golf betting analysis" },
 ];
 
-function TwitterEmbed({ handle }: { handle: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.innerHTML = "";
-    setStatus("loading");
-
-    const doEmbed = () => {
-      if (!containerRef.current) return;
-      (window as any).twttr.widgets.createTimeline(
-        { sourceType: "profile", screenName: handle },
-        containerRef.current,
-        {
-          theme: "dark",
-          chrome: "noheader nofooter noborders transparent",
-          tweetLimit: 8,
-          height: 600,
-        }
-      ).then((el: unknown) => {
-        setStatus(el ? "ok" : "error");
-      }).catch(() => setStatus("error"));
-    };
-
-    if ((window as any).twttr?.widgets?.createTimeline) {
-      doEmbed();
-    } else {
-      const existing = document.querySelector("script[src*='platform.twitter.com']");
-      if (!existing) {
-        const s = document.createElement("script");
-        s.src = "https://platform.twitter.com/widgets.js";
-        s.async = true;
-        s.onload = doEmbed;
-        s.onerror = () => setStatus("error");
-        document.head.appendChild(s);
-      } else {
-        // Script already in DOM but twttr not ready yet — poll
-        let tries = 0;
-        const poll = setInterval(() => {
-          tries++;
-          if ((window as any).twttr?.widgets?.createTimeline) {
-            clearInterval(poll);
-            doEmbed();
-          } else if (tries > 20) {
-            clearInterval(poll);
-            setStatus("error");
-          }
-        }, 250);
-      }
-    }
-  }, [handle]);
-
-  return (
-    <div style={{ position: "relative", minHeight: 300 }}>
-      {status === "loading" && (
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", flexDirection: "column" as const,
-          alignItems: "center", justifyContent: "center", gap: 12,
-        }}>
-          <div style={{ fontSize: 28, opacity: 0.6 }}>𝕏</div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Loading @{handle}…</div>
-        </div>
-      )}
-      {status === "error" && (
-        <div style={{
-          display: "flex", flexDirection: "column" as const, alignItems: "center",
-          justifyContent: "center", gap: 12, padding: 40,
-        }}>
-          <div style={{ fontSize: 28 }}>𝕏</div>
-          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textAlign: "center" as const }}>
-            Twitter embed blocked by your browser or ad blocker.
-          </div>
-          <a href={`https://twitter.com/${handle}`} target="_blank" rel="noopener noreferrer"
-            style={{ padding: "10px 20px", background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)", borderRadius: 8, color: "var(--accent)", textDecoration: "none", fontSize: 14 }}>
-            Open @{handle} on X ↗
-          </a>
-        </div>
-      )}
-      <div ref={containerRef} />
-    </div>
-  );
+interface NewsItem {
+  title: string; link: string; description: string;
+  pubDate: string; source: string; sourceLabel: string; imageUrl: string | null;
 }
 
+function timeAgo(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const diff = Date.now() - d.getTime();
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return `${m}m ago`;
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+
+const SOURCE_COLORS: Record<string, string> = {
+  espn: "#c84b11",
+  golf: "#1a5c2a",
+  golfchannel: "#003087",
+};
+
 function NewsroomTab() {
-  const [selected, setSelected] = useState("TheMasters");
-  const account = NEWSROOM_ACCOUNTS.find(a => a.handle === selected)!;
+  const [items, setItems] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    fetch("/api/news")
+      .then(r => r.json())
+      .then(d => { setItems(d.items ?? []); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
+  }, []);
+
+  const sources = ["all", ...Array.from(new Set(items.map(i => i.source)))];
+  const filtered = filter === "all" ? items : items.filter(i => i.source === filter);
 
   return (
     <div>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>
-          Live Feed
-        </div>
-        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)", marginBottom: 4 }}>
-          Golf Newsroom
-        </div>
-        <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>
-          Live updates from the best golf accounts on X — tap any source to switch feeds.
+        <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 4 }}>Live Feed</div>
+        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)", marginBottom: 4 }}>Golf Newsroom</div>
+        <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>Live headlines from ESPN Golf, PGA Tour & Golf Digest · Updated every 5 min</div>
+      </div>
+
+      {/* Follow on X buttons */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8 }}>FOLLOW ON X</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+          {NEWSROOM_ACCOUNTS.map(a => (
+            <a key={a.handle} href={`https://twitter.com/${a.handle}`} target="_blank" rel="noopener noreferrer"
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
+                borderRadius: 20, fontSize: 12, textDecoration: "none",
+                background: "rgba(255,255,255,0.05)", border: "1px solid var(--card-border)",
+                color: "var(--cream-dim)", transition: "all 0.2s",
+              }}>
+              <span style={{ fontSize: 14 }}>𝕏</span>
+              <span>@{a.handle}</span>
+            </a>
+          ))}
         </div>
       </div>
 
-      {/* Account selector */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 20 }}>
-        {NEWSROOM_ACCOUNTS.map(a => (
-          <button key={a.handle} onClick={() => setSelected(a.handle)} style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "7px 12px", borderRadius: 20, fontSize: 13, cursor: "pointer",
-            fontFamily: "EB Garamond, serif",
-            background: selected === a.handle ? "var(--accent)" : "var(--card-bg)",
-            color: selected === a.handle ? "var(--bg)" : "var(--cream-dim)",
-            border: `1px solid ${selected === a.handle ? "var(--accent)" : "var(--card-border)"}`,
-            fontWeight: selected === a.handle ? 700 : 400,
-            transition: "all 0.2s",
-          }}>
-            <span>{a.emoji}</span>
-            <span>@{a.handle}</span>
-          </button>
+      {/* Source filter */}
+      {!loading && items.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" as const }}>
+          {sources.map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{
+              padding: "5px 14px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+              fontFamily: "EB Garamond, serif",
+              background: filter === s ? "var(--accent)" : "var(--card-bg)",
+              color: filter === s ? "var(--bg)" : "var(--cream-dim)",
+              border: `1px solid ${filter === s ? "var(--accent)" : "var(--card-border)"}`,
+              fontWeight: filter === s ? 700 : 400,
+            }}>
+              {s === "all" ? "All Sources" : s === "espn" ? "ESPN Golf" : s === "golf" ? "Golf.com" : "Golf Channel"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* News feed */}
+      {loading && (
+        <div style={{ textAlign: "center" as const, padding: 60, color: "var(--cream-dim)" }}>
+          <div style={{ fontSize: 28, marginBottom: 12 }}>⛳</div>
+          <div>Loading latest golf news…</div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ textAlign: "center" as const, padding: 40, color: "var(--cream-dim)" }}>
+          <div style={{ fontSize: 13 }}>Unable to load news. Check back in a moment.</div>
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
+        <div style={{ textAlign: "center" as const, padding: 40, color: "var(--cream-dim)" }}>
+          <div style={{ fontSize: 13 }}>No news available right now.</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
+        {filtered.map((item, i) => (
+          <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+            <div style={{
+              background: "var(--card-bg)", border: "1px solid var(--card-border)",
+              borderRadius: 10, overflow: "hidden", display: "flex",
+              transition: "border-color 0.2s",
+            }}>
+              {/* Image */}
+              {item.imageUrl && (
+                <div style={{ width: 100, flexShrink: 0, overflow: "hidden" }}>
+                  <img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+                </div>
+              )}
+              {/* Content */}
+              <div style={{ padding: "12px 14px", flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{
+                    fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 700,
+                    background: SOURCE_COLORS[item.source] ?? "rgba(255,255,255,0.1)",
+                    color: "#fff", letterSpacing: "0.06em",
+                  }}>
+                    {item.sourceLabel.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{timeAgo(item.pubDate)}</span>
+                </div>
+                <div style={{ fontSize: 15, color: "var(--cream)", fontFamily: "Playfair Display, serif", lineHeight: 1.3, marginBottom: 5 }}>
+                  {item.title}
+                </div>
+                {item.description && (
+                  <div style={{ fontSize: 12, color: "var(--cream-dim)", lineHeight: 1.5, overflow: "hidden",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
+                    {item.description}
+                  </div>
+                )}
+              </div>
+            </div>
+          </a>
         ))}
       </div>
 
-      {/* Active account info */}
-      <div style={{
-        background: "var(--card-bg)", border: "1px solid var(--card-border)",
-        borderRadius: 10, padding: "12px 16px", marginBottom: 16,
-        display: "flex", alignItems: "center", gap: 12,
-      }}>
-        <span style={{ fontSize: 22 }}>{account.emoji}</span>
-        <div>
-          <div style={{ fontSize: 15, color: "var(--cream)", fontWeight: 600 }}>
-            {account.label} <span style={{ color: "var(--accent)", fontWeight: 400, fontSize: 13 }}>@{account.handle}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--cream-dim)" }}>{account.desc}</div>
+      {!loading && filtered.length > 0 && (
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center" as const, marginTop: 20 }}>
+          {filtered.length} articles · Refreshes every 5 minutes
         </div>
-        <a href={`https://twitter.com/${account.handle}`} target="_blank" rel="noopener noreferrer"
-          style={{ marginLeft: "auto", fontSize: 12, color: "var(--accent)", textDecoration: "none", flexShrink: 0, padding: "4px 10px", border: "1px solid var(--card-border)", borderRadius: 6 }}>
-          Open on X ↗
-        </a>
-      </div>
-
-      {/* Twitter embed — key forces full remount on account change */}
-      <div style={{
-        background: "var(--card-bg)", border: "1px solid var(--card-border)",
-        borderRadius: 10, overflow: "hidden", minHeight: 400,
-      }}>
-        <TwitterEmbed key={selected} handle={selected} />
-      </div>
-
-      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: 12 }}>
-        Powered by X (Twitter) · Tap any account above to switch feeds
-      </div>
+      )}
     </div>
   );
 }
@@ -2199,7 +2198,7 @@ export default function Page() {
       <ChampionBanner tournament={tournament} />
 
       {/* Tab nav */}
-      <div style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, padding: "0 24px", display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
+      <div className="tab-nav" style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
         {(["picks", "leaderboard", "tournament", "history", "course", "newsroom"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "13px 18px", fontSize: 14, background: "transparent", border: "none",
@@ -2219,7 +2218,7 @@ export default function Page() {
       </div>
 
       {/* Content */}
-      <main style={{ maxWidth: 700, margin: "0 auto", padding: "28px 20px" }}>
+      <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
         {tab === "picks" && token && userId && (
           <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} onPicksChanged={() => fetchData(token)} />
         )}

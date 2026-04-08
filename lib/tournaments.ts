@@ -49,8 +49,24 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
       // Wikimedia Commons — verified Augusta National photos
       photos: [
         {
+          url: "/courses/pimento-sandwich.jpg",
+          caption: "Pimento Cheese Sandwich & Sweet Tea · Augusta National",
+        },
+        {
+          url: "/courses/rory-mcilroy.jpg",
+          caption: "Rory McIlroy — 2025 Masters Champion · Augusta National",
+        },
+        {
+          url: "/courses/par-3.jpg",
+          caption: "Amen Corner · Augusta National Golf Club",
+        },
+        {
           url: "https://commons.wikimedia.org/wiki/Special:FilePath/Augusta_National_Golf_Club_12th_hole.jpg",
           caption: "12th Hole — Golden Bell · Augusta National",
+        },
+        {
+          url: "/courses/tiger-woods.jpg",
+          caption: "Tiger Woods — Augusta National",
         },
         {
           url: "https://commons.wikimedia.org/wiki/Special:FilePath/Augusta_National_Golf_Club_13th_hole.jpg",
