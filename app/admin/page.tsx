@@ -46,7 +46,7 @@ interface Overrides {
   useManualScores?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const S: Record<string, any> = {
   page: { minHeight: "100vh", background: "#0a0a0a", color: "#e0e0e0", fontFamily: "monospace", padding: 0 },
   header: { background: "#111", borderBottom: "1px solid #333", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
@@ -383,6 +383,17 @@ export default function AdminPage() {
     if (!user) return;
     setSaving(true);
     try {
+      // Auto-ensure required overrides are set so picks are visible on main app
+      if (!overrides.revealAll || !overrides.skipDeadline || overrides.roundOverride !== proxyRound) {
+        const newOverrides = { ...overrides, revealAll: true, skipDeadline: true, roundOverride: proxyRound };
+        await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-password": password },
+          body: JSON.stringify({ action: "save_overrides", overrides: newOverrides }),
+        });
+        setOverrides(newOverrides);
+      }
+
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-password": password },
@@ -390,9 +401,9 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) { setProxyMsg(data.error ?? "Error"); setProxyMsgType("err"); }
-      else { setProxyMsg(`✓ Picks submitted for ${user.username} — Round ${proxyRound}`); setProxyMsgType("ok"); setProxyPicks([]); }
+      else { setProxyMsg(`✓ Picks submitted for ${user.username} R${proxyRound} — refresh main app to see`); setProxyMsgType("ok"); setProxyPicks([]); }
     } catch { setProxyMsg("Network error"); setProxyMsgType("err"); }
-    finally { setSaving(false); setTimeout(() => setProxyMsg(""), 4000); }
+    finally { setSaving(false); setTimeout(() => setProxyMsg(""), 6000); }
   }
 
   if (!authed) {
@@ -588,10 +599,14 @@ export default function AdminPage() {
         {/* ── Submit Picks As User ── */}
         <div style={S.section}>
           <div style={S.sectionTitle}>👤 Submit Picks As Player</div>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
-            Use this if someone misses the deadline and you want to enter picks on their behalf.
-            Burned golfers (already used in prior rounds) will be blocked.
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+            Submit picks on behalf of any user. Automatically sets revealAll + skipDeadline + roundOverride.
           </div>
+          {!overrides.useManualScores && (
+            <div style={{ fontSize: 12, color: "#f0c040", background: "#2a2000", border: "1px solid #4a3800", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+              ⚠ Manual scores not active. After submitting picks, also save scores so the leaderboard shows real values (not E).
+            </div>
+          )}
 
           {proxyMsg && (
             <div style={proxyMsgType === "ok" ? S.success : S.error}>{proxyMsg}</div>

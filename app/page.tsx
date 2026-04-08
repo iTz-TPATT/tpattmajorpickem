@@ -58,7 +58,7 @@ function PlayerAvatar({ username, size = 32, style }: {
       ...style,
     }}>
       {currentSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        
         <img
           src={currentSrc}
           alt={username}
@@ -400,7 +400,7 @@ function GolferCard({
         {/* Headshot */}
         <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)" }}>
           {headshot ? (
-            // eslint-disable-next-line @next/next/no-img-element
+            
             <img src={headshot} alt={name} width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           ) : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "var(--cream-dim)" }}>
@@ -620,7 +620,7 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
     }}>
       {/* Photo */}
       {photo && (
-        // eslint-disable-next-line @next/next/no-img-element
+        
         <img
           key={`${tournament.id}-${idx}`}
           src={photo.url}
@@ -727,7 +727,7 @@ function MyPicksTab({
 }) {
   const round = getCurrentRound(tournament);
   const revealed = isRoundRevealed(tournament, round);
-  const revealDate = new Date(tournament.rounds[round as 1|2|3|4].revealTimeUTC);
+  const revealDate = new Date(tournament.rounds[round as 1|2|3|4].revealTimeUTC); // eslint-disable-line react-hooks/exhaustive-deps
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -1274,7 +1274,7 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
                       <div key={g} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6, marginBottom: 4, fontSize: 14 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           {sc?.headshot && (
-                            // eslint-disable-next-line @next/next/no-img-element
+                            
                             <img src={sc.headshot} alt={g} width={24} height={24} style={{ borderRadius: "50%", objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                           )}
                           <span style={{ color: notCounted ? "var(--cream-dim)" : "var(--cream)", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
@@ -1523,6 +1523,8 @@ export default function Page() {
   const [picks, setPicks] = useState<Pick[]>([]);
   const [scores, setScores] = useState<GolferScore[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<{id: string; username: string}[]>([]);
+  const [roundOverride, setRoundOverride] = useState<number | null>(null);
+  const [adminOverrides, setAdminOverrides] = useState<{roundOverride?: number; revealAll?: boolean}>({});
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const tournament = getActiveTournament();
@@ -1538,25 +1540,30 @@ export default function Page() {
 
   const fetchData = useCallback(async (t: string) => {
     const tid = tournament.id;
-    const [picksRes, scoresRes, oddsRes, playersRes, usersRes] = await Promise.all([
+    const [picksRes, scoresRes, oddsRes, playersRes, usersRes, overridesRes] = await Promise.all([
       fetch(`/api/picks?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` } }),
       fetch(`/api/scores?tournament=${tid}`),
       fetch(`/api/odds?tournament=${tid}`),
       fetch("/api/players", { headers: { Authorization: `Bearer ${t}` } }),
       fetch("/api/users", { headers: { Authorization: `Bearer ${t}` } }),
+      fetch("/api/overrides"),
     ]);
     if (picksRes.ok) setPicks((await picksRes.json()).picks ?? []);
     if (scoresRes.ok) setScores((await scoresRes.json()).scores ?? []);
     if (oddsRes.ok) setOdds((await oddsRes.json()).odds ?? {});
     if (playersRes.ok) setPlayerCount((await playersRes.json()).count ?? 0);
     if (usersRes.ok) setRegisteredUsers((await usersRes.json()).users ?? []);
+    if (overridesRes.ok) setAdminOverrides((await overridesRes.json()).overrides ?? {});
   }, [tournament.id]);
 
   useEffect(() => { if (token) fetchData(token); }, [token, fetchData]);
   useEffect(() => {
     if (!token) return;
-    const interval = setInterval(() => fetchData(token), 2 * 60 * 1000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => fetchData(token), 30 * 1000);
+    // Also refresh when user comes back to this tab
+    const onVisible = () => { if (document.visibilityState === "visible") fetchData(token); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, [token, fetchData]);
 
   function handleLogin(t: string, u: string) {
@@ -1622,7 +1629,7 @@ export default function Page() {
           <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={getCurrentRound(tournament)} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} />
         )}
         {tab === "history" && (
           <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />

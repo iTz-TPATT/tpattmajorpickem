@@ -33,10 +33,10 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
     id: "masters", name: "The Masters Tournament", shortName: "The Masters",
     location: "Augusta National Golf Club · Augusta, GA", year: 2026,
     rounds: {
-      1: { date: "2026-04-10", revealTimeUTC: "2026-04-10T12:00:00Z" },
-      2: { date: "2026-04-11", revealTimeUTC: "2026-04-11T12:00:00Z" },
-      3: { date: "2026-04-12", revealTimeUTC: "2026-04-12T13:30:00Z" },
-      4: { date: "2026-04-13", revealTimeUTC: "2026-04-13T13:30:00Z" },
+      1: { date: "2026-04-09", revealTimeUTC: "2026-04-09T12:00:00Z" },
+      2: { date: "2026-04-10", revealTimeUTC: "2026-04-10T12:00:00Z" },
+      3: { date: "2026-04-11", revealTimeUTC: "2026-04-11T13:30:00Z" },
+      4: { date: "2026-04-12", revealTimeUTC: "2026-04-12T13:30:00Z" },
     },
     priorChampion: { name: "Wyatt T.O. Robson", year: 2025 },
     theme: {
