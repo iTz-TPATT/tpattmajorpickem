@@ -575,17 +575,19 @@ function AuthScreen({ tournament, onLogin }: { tournament: Tournament; onLogin: 
 const DISPLAY_MS = 6000;  // how long each photo shows
 const FADE_MS    = 800;   // fade duration — consistent for all photos
 
-function CourseHero({ tournament }: { tournament: Tournament }) {
+function CourseHero({ tournament, splashDone }: { tournament: Tournament; splashDone: boolean }) {
   const [photos, setPhotos] = useState<{ url: string; fallbackUrl?: string; caption: string }[]>([]);
   const [idx, setIdx] = useState(0);
   const [opacity, setOpacity] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rotationStarted = useRef(false);
 
   // Fetch photos on mount
   useEffect(() => {
     setPhotos([]);
     setIdx(0);
     setOpacity(0);
+    rotationStarted.current = false;
     fetch(`/api/course-photos?tournament=${tournament.id}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.photos) && d.photos.length > 0) setPhotos(d.photos); })
@@ -606,10 +608,14 @@ function CourseHero({ tournament }: { tournament: Tournament }) {
     }, DISPLAY_MS);
   }, [photos.length]);
 
+  // Only start rotating after splash is done
   useEffect(() => {
-    if (photos.length > 1) startTimer();
+    if (photos.length > 1 && splashDone && !rotationStarted.current) {
+      rotationStarted.current = true;
+      startTimer();
+    }
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [idx, photos.length, startTimer]);
+  }, [idx, photos.length, startTimer, splashDone]);
 
   function goTo(i: number) {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -2194,7 +2200,7 @@ export default function Page() {
       </div>
 
       {/* Champion banner */}
-      <CourseHero tournament={tournament} />
+      <CourseHero tournament={tournament} splashDone={splashDone} />
       <ChampionBanner tournament={tournament} />
 
       {/* Tab nav */}
