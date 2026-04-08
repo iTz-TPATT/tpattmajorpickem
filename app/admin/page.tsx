@@ -445,6 +445,42 @@ export default function AdminPage() {
       <div style={S.content}>
         {msg && <div style={msgType === "ok" ? S.success : S.error}>{msg}</div>}
 
+        {/* ── Live DB Status ── */}
+        <div style={{ background: "#0a0a0a", border: "1px solid #222", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.08em", marginBottom: 10 }}>📡 LIVE DB STATE — what the app actually sees right now</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            {([
+              { label: "Reveal All", key: "revealAll" as keyof Overrides, desc: "Other users' picks visible" },
+              { label: "Skip Deadline", key: "skipDeadline" as keyof Overrides, desc: "Picks accepted any time" },
+              { label: "Manual Scores", key: "useManualScores" as keyof Overrides, desc: "Your scores used (not ESPN)" },
+              { label: "Round Override", key: "roundOverride" as keyof Overrides, desc: "Active round forced" },
+            ]).map(({ label, key, desc }) => {
+              const val = overrides[key];
+              const isOn = key === "roundOverride" ? (val !== undefined && val !== null) : !!val;
+              return (
+                <div key={key} style={{ background: isOn ? "rgba(93,186,126,0.08)" : "rgba(255,255,255,0.02)", border: `1px solid ${isOn ? "rgba(93,186,126,0.3)" : "#222"}`, borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: isOn ? "#5dba7e" : "#444", flexShrink: 0 }} />
+                    <div style={{ fontSize: 12, color: isOn ? "#5dba7e" : "#666", fontWeight: 600 }}>{label}</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#444" }}>{desc}</div>
+                  {key === "roundOverride" && val !== undefined && <div style={{ fontSize: 12, color: "#f0c040", marginTop: 2 }}>Round {String(val)}</div>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, color: "#555", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
+            <span>All 3 required for testing:</span>
+            <span style={{ color: overrides.revealAll ? "#5dba7e" : "#e07b6f" }}>{overrides.revealAll ? "✓" : "✗"} Reveal All</span>
+            <span style={{ color: overrides.useManualScores ? "#5dba7e" : "#e07b6f" }}>{overrides.useManualScores ? "✓" : "✗"} Manual Scores</span>
+            <span style={{ color: overrides.roundOverride ? "#5dba7e" : "#e07b6f" }}>{overrides.roundOverride ? `✓ Round ${overrides.roundOverride}` : "✗ Round Override"}</span>
+            <button onClick={() => saveOverrides({ ...overrides, revealAll: true, useManualScores: true, skipDeadline: true, roundOverride: overrides.roundOverride ?? 1 })}
+              style={{ background: "none", border: "1px solid #444", color: "#aaa", fontSize: 11, borderRadius: 4, padding: "2px 8px", cursor: "pointer" }}>
+              ⚡ Enable All Required
+            </button>
+          </div>
+        </div>
+
         {/* ── Test Mode Controls ── */}
         <div style={S.section}>
           <div style={S.sectionTitle}>🧪 Test Mode Controls</div>
