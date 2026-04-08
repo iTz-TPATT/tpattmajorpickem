@@ -777,6 +777,53 @@ export default function AdminPage() {
           <PhotoDebug />
         </div>
 
+        {/* ── Picks + Scores Pipeline Debug ── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>🔬 Picks &amp; Scores Pipeline Debug</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
+            Diagnoses why picks or scores may not be showing on the main app.
+          </div>
+          <button onClick={async () => {
+            setOddsDebug("Fetching pipeline debug...");
+            try {
+              const res = await fetch(`/api/debug-leaderboard?password=${encodeURIComponent(password)}`);
+              const d = await res.json();
+              if (!res.ok) { setOddsDebug("❌ " + (d.error ?? "Error")); return; }
+              const diag = d.diagnosis;
+              const lines = [
+                `OVERRIDES IN DB:`,
+                `  revealAll: ${diag.revealAll} ${diag.revealAll ? "✓" : "❌ — other picks hidden"}`,
+                `  useManualScores: ${diag.useManualScores} ${diag.useManualScores ? "✓" : "❌ — ESPN used (no live data yet)"}`,
+                `  skipDeadline: ${diag.skipDeadline} ${diag.skipDeadline ? "✓" : "❌"}`,
+                `  roundOverride: ${diag.roundOverride ?? "not set"} ${diag.roundOverride ? "✓" : "❌ — defaults to real date logic"}`,
+                ``,
+                `DATA IN DB:`,
+                `  manual scores saved: ${diag.hasManualScores ? "✓ (" + d.manualScoresCount + " golfers)" : "❌ none"}`,
+                `  picks in DB: ${diag.hasPicks ? "✓" : "❌ none"}`,
+                `  registered users: ${(d.registeredUsers ?? []).join(", ") || "none"}`,
+                ``,
+                `SCORE MATCH TEST (first user's R1 picks vs manual scores):`,
+                `  user: ${d.scoreLookupTest?.user ?? "no picks yet"}`,
+                `  picks: ${(d.scoreLookupTest?.r1Picks ?? []).join(", ") || "none"}`,
+                ...(d.scoreLookupTest?.results ?? []).map((r: {golfer: string; found: boolean; r1: unknown}) =>
+                  `  ${r.found ? "✓" : "❌ NAME MISMATCH"} "${r.golfer}" → r1: ${r.r1}`
+                ),
+                ``,
+                `PICKS BY USER:`,
+                ...Object.entries(d.picksByUser ?? {}).map(([u, rounds]) =>
+                  `  ${u}: ${Object.entries(rounds as Record<string, string[]>).map(([r, gs]) => `R${r}: ${(gs as string[]).join(", ")}`).join(" | ")}`
+                ),
+              ];
+              setOddsDebug(lines.join("\n"));
+            } catch (e) { setOddsDebug("❌ Error: " + String(e)); }
+          }} style={S.btn("blue")}>🔍 Run Pipeline Diagnosis</button>
+          {oddsDebug && oddsDebug.includes("OVERRIDES") && (
+            <pre style={{ marginTop: 12, padding: "10px 14px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 6, fontSize: 12, color: "#ccc", lineHeight: 1.7, whiteSpace: "pre-wrap" as const, overflowX: "auto" as const }}>
+              {oddsDebug}
+            </pre>
+          )}
+        </div>
+
         {/* ── Odds Debug ── */}
         <div style={S.section}>
           <div style={S.sectionTitle}>📈 Odds API Debug</div>
