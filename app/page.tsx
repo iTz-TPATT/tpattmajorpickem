@@ -1435,8 +1435,8 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("hold"), 600);
-    const t2 = setTimeout(() => setPhase("out"), 6000);
-    const t3 = setTimeout(() => onDone(), 6800);
+    const t2 = setTimeout(() => setPhase("out"), 10000);
+    const t3 = setTimeout(() => onDone(), 10800);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onDone]);
 
@@ -1454,7 +1454,7 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
           position: "absolute", inset: 0,
           backgroundImage: `url(${bgImage})`,
           backgroundSize: "cover", backgroundPosition: "right center",
-          opacity: 0.45, filter: "none",
+          opacity: 0.72, filter: "none",
         }} />
       )}
       <div style={{
@@ -1740,9 +1740,24 @@ export default function Page() {
 
   // Initialize audio once
   useEffect(() => {
-    const audio = new Audio("https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg");
+    // Try multiple sources in order
+    const sources = [
+      "https://www.televisiontunes.com/uploads/audio/CBS%20-%20Masters%20Golf%20Tournament.mp3",
+      "https://archive.org/download/tvtunes_7756/CBS%20-%20Masters%20Golf%20Tournament.mp3",
+      "https://upload.wikimedia.org/wikipedia/en/1/1b/Augusta.ogg",
+    ];
+    const audio = new Audio();
     audio.volume = 0.35;
     audio.loop = true;
+    // Try each source until one loads
+    let srcIndex = 0;
+    const tryNext = () => {
+      if (srcIndex >= sources.length) return;
+      audio.src = sources[srcIndex++];
+      audio.load();
+    };
+    audio.addEventListener("error", tryNext);
+    tryNext();
     musicRef.current = audio;
     return () => { audio.pause(); };
   }, []);
