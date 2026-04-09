@@ -24,13 +24,25 @@ function normalizeName(name: string): string {
 
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
-function avatarUrl(username: string): string {
-  // Convert "Trenton Patterson" -> "/avatars/trenton-patterson.jpg"
+// Aliases for users who signed up with only a first name.
+// Maps the stored username → { displayName, avatarSlug }
+const USER_ALIASES: Record<string, { displayName: string; avatarSlug: string }> = {
+  "Corbin":  { displayName: "Corbin Blount",  avatarSlug: "corbin-blount" },
+  "Spencer": { displayName: "Spencer Ledwith", avatarSlug: "spencer-ledwith" },
+};
+
+function resolveUser(username: string): { displayName: string; avatarSlug: string } {
+  const alias = USER_ALIASES[username.trim()];
+  if (alias) return alias;
   const slug = username.trim().toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, "-");
-  return `/avatars/${slug}.jpg`;
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, "-");
+  return { displayName: username, avatarSlug: slug };
+}
+
+function avatarUrl(username: string): string {
+  const { avatarSlug } = resolveUser(username);
+  return `/avatars/${avatarSlug}.jpg`;
 }
 
 function PlayerAvatar({ username, size = 32, style }: {
@@ -39,15 +51,11 @@ function PlayerAvatar({ username, size = 32, style }: {
   style?: React.CSSProperties;
 }) {
   const [srcIndex, setSrcIndex] = useState(0);
-  const initials = username.trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? "").slice(0, 2).join("");
+  const { displayName, avatarSlug } = resolveUser(username);
+  const initials = displayName.trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? "").slice(0, 2).join("");
   const hue = username.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
 
-  // Try jpg first, then png, then show initials
-  const slug = username.trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 ]/g, "")
-    .replace(/\s+/g, "-");
-  const srcs = [`/avatars/${slug}.jpg`, `/avatars/${slug}.png`];
+  const srcs = [`/avatars/${avatarSlug}.jpg`, `/avatars/${avatarSlug}.png`];
   const currentSrc = srcs[srcIndex];
 
   return (
@@ -1195,7 +1203,7 @@ function LeaderboardTab({
                       color: isLeader ? "#c9a84c" : "#e8dcc8",
                       fontFamily: "Playfair Display, serif",
                       overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2,
-                    }}>{u.username}</div>
+                    }}>{resolveUser(u.username).displayName}</div>
                     {/* Round pick status badges — show status for each active round */}
                     {currentRound <= 4 && (() => {
                       const hasCurrentPick = submittedCurrentRound.has(u.uid);
@@ -1365,7 +1373,7 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <PlayerAvatar username={u.username} size={28} />
                       <span style={{ fontSize: 15, color: i === 0 ? "var(--accent)" : "var(--cream)", fontFamily: "Playfair Display, serif" }}>
-                        {i === 0 && "🏅 "}{u.username}
+                        {i === 0 && "🏅 "}{resolveUser(u.username).displayName}
                       </span>
                     </div>
                     <span style={{ fontFamily: "monospace", fontSize: 16, color: scoreColor(u.score) }}>{fmtScore(u.score)}</span>
@@ -2102,7 +2110,7 @@ function RoundLeaderBanner({ picks, scores, registeredUsers }: {
             Leader through Round {leaderInfo.round}
           </div>
           <div style={{ fontSize: 18, fontWeight: 600, color: "#f0e9d6", fontFamily: "Playfair Display, serif" }}>
-            {leaderInfo.username} <span style={{ color: "#5dba7e", fontSize: 15 }}>{scoreStr}</span>
+            {resolveUser(leaderInfo.username).displayName} <span style={{ color: "#5dba7e", fontSize: 15 }}>{scoreStr}</span>
           </div>
         </div>
       </div>
@@ -2362,7 +2370,7 @@ export default function Page() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <PlayerAvatar username={username} size={28} />
-          <span style={{ fontSize: 14, color: th.creamDim, fontStyle: "italic" }}>{username}</span>
+          <span style={{ fontSize: 14, color: th.creamDim, fontStyle: "italic" }}>{resolveUser(username).displayName}</span>
           <button onClick={handleMuteToggle} title={musicMuted ? "Unmute music" : "Mute music"} style={{
             background: "transparent", border: `1px solid ${th.cardBorder}`,
             color: th.creamDim, padding: "6px 10px", borderRadius: 6, fontSize: 15, cursor: "pointer",
