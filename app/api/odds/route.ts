@@ -76,13 +76,19 @@ async function fetchLiveOdds(
     const events = await evRes.json() as unknown[];
     if (!Array.isArray(events) || !events.length) return null;
 
-    // Find an event that is currently live (commenced but not completed)
+    // Find the best candidate event: prefer in-progress (started, not completed),
+    // but fall back to the most recently started event regardless of completed flag.
     const now = Date.now();
-    const liveEvent = events.find((ev) => {
+    const started = events.filter((ev) => {
       const e = ev as Record<string, unknown>;
-      const start = new Date(e.commence_time as string).getTime();
-      return start <= now && !(e.completed as boolean);
-    }) as Record<string, unknown> | undefined;
+      return new Date(e.commence_time as string).getTime() <= now;
+    }) as Record<string, unknown>[];
+
+    const liveEvent: Record<string, unknown> | undefined =
+      started.find(e => !e.completed) ??    // prefer in-progress
+      started.sort((a, b) =>                // fall back to most recent
+        new Date(b.commence_time as string).getTime() - new Date(a.commence_time as string).getTime()
+      )[0];
 
     if (!liveEvent) return null;
 

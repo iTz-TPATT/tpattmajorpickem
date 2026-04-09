@@ -835,15 +835,16 @@ export default function AdminPage() {
             <button onClick={async () => {
               setOddsDebug("Fetching...");
               try {
-                const res = await fetch("/api/odds?tournament=masters&debug=1", { headers: { "x-admin-password": password } });
+                const res = await fetch("/api/odds?tournament=masters&debug=1&bust=1", { headers: { "x-admin-password": password } });
                 const data = await res.json();
                 const source = data.source ?? "unknown";
                 const count = Object.keys(data.odds ?? {}).length;
+                const debugLines = (data.debugInfo as string[] | undefined)?.join("\n") ?? "";
                 if (count === 0) {
-                  setOddsDebug(`❌ No odds returned. Source: ${source}. Check that ODDS_API_KEY is set in Vercel and the Masters event is live on the-odds-api.com.`);
+                  setOddsDebug(`❌ No odds returned. Source: ${source}.\n\nAPI trace:\n${debugLines || "(no trace — check ODDS_API_KEY is set in Vercel env vars)"}`);
                 } else {
-                  const sample = Object.entries(data.odds as Record<string,string>).slice(0, 5).map(([k,v]) => `${k}: ${v}`).join(" · ");
-                  setOddsDebug(`✓ ${count} players loaded (${source}). Sample: ${sample}`);
+                  const sample = Object.entries(data.odds as Record<string,string>).filter(([k]) => !k.includes(" ")).slice(0, 6).map(([k,v]) => `${k}: ${v}`).join(" · ");
+                  setOddsDebug(`✓ ${count} entries loaded (${source}).\nSample: ${sample}\n\nAPI trace:\n${debugLines}`);
                 }
               } catch { setOddsDebug("❌ Network error fetching odds"); }
             }} style={S.btn("blue")}>🔍 Test Odds API</button>
@@ -855,7 +856,7 @@ export default function AdminPage() {
             }} style={S.btn("yellow")}>↺ Clear Odds Cache</button>
           </div>
           {oddsDebug && (
-            <div style={{ marginTop: 12, padding: "10px 14px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 6, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#1a1a1a", border: "1px solid #333", borderRadius: 6, fontSize: 12, color: "#ccc", lineHeight: 1.6, whiteSpace: "pre-wrap", fontFamily: "monospace" }}>
               {oddsDebug}
             </div>
           )}

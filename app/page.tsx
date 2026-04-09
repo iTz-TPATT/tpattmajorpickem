@@ -1013,9 +1013,14 @@ function MyPicksTab({
             {myPicks.map((g, i) => {
               const sc = scoreMap[g];
               const rs = getRoundScore(sc, r);
-              // For R1/R2, mark the highest score as "not counted"
-              const sortedScores = [...roundScores].sort((a, b) => (a ?? 999) - (b ?? 999));
-              const notCounted = r <= 2 && roundScores.indexOf(rs) !== -1 && i === roundScores.indexOf(Math.max(...roundScores.map((s) => s ?? -999)));
+              // For R1/R2 drop the highest (worst) score. If tied, drop the last index.
+              // Build sorted indices by score descending, drop the first (worst)
+              const droppedIndex = r <= 2 && roundScores.length === 3
+                ? roundScores
+                    .map((s, idx) => ({ s: s ?? 999, idx }))
+                    .sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
+                : -1;
+              const notCounted = droppedIndex === i;
               return (
                 <div key={g} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1280,7 +1285,9 @@ function LeaderboardTab({
                   {Object.entries(u.rounds).map(([r, rd]) => {
                     const rNum = parseInt(r);
                     const roundScores = rd.picks.map((g) => getRoundScore(scoreMap[g], rNum));
-                    const maxScore = Math.max(...roundScores.map((s) => s ?? -999));
+                    const droppedIdxLb = rNum <= 2 && roundScores.length === 3
+                      ? roundScores.map((s, idx) => ({ s: s ?? 999, idx })).sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
+                      : -1;
 
                     return (
                       <div key={r} style={{ marginBottom: 12 }}>
@@ -1292,7 +1299,7 @@ function LeaderboardTab({
                         </div>
                         {rd.picks.map((g, pi) => {
                           const rs = roundScores[pi];
-                          const notCounted = rNum <= 2 && rs === maxScore && rd.picks.length === 3;
+                          const notCounted = droppedIdxLb === pi;
                           return (
                             <div key={g} style={{
                               display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -1366,7 +1373,9 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
             </div>
 
             {withScores.map((u, i) => {
-              const maxScore = Math.max(...u.roundScores.map((s) => s ?? -999));
+              const droppedIdxHist = r <= 2 && u.roundScores.length === 3
+                ? u.roundScores.map((s, idx) => ({ s: s ?? 999, idx })).sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
+                : -1;
               return (
                 <div key={u.username} style={{ marginBottom: 18 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
@@ -1381,7 +1390,7 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
                   {u.picks.map((g, pi) => {
                     const rs = u.roundScores[pi];
                     const sc = scoreMap[g];
-                    const notCounted = r <= 2 && rs === maxScore && u.picks.length === 3;
+                    const notCounted = droppedIdxHist === pi;
                     return (
                       <div key={g} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6, marginBottom: 4, fontSize: 14 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

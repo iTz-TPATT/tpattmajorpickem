@@ -11,7 +11,17 @@ export interface GolferScore {
   thru: string | null;    // e.g. "F" or "9" or "*3"
 }
 
-function parseESPN(data: unknown): GolferScore[] {
+// Par per tournament — used to convert raw strokes to to-par if ESPN
+// doesn't return a displayValue
+const TOURNAMENT_PAR: Record<string, number> = {
+  masters: 72,
+  pga:     70,
+  usopen:  70,
+  theopen: 71,
+};
+
+function parseESPN(data: unknown, tournamentId = "masters"): GolferScore[] {
+  const par = TOURNAMENT_PAR[tournamentId] ?? 72;
   const players: GolferScore[] = [];
   try {
     const d = data as Record<string, unknown>;
@@ -26,42 +36,70 @@ function parseESPN(data: unknown): GolferScore[] {
       const linescores = (comp.linescores as unknown[]) ?? [];
       const statusObj = (comp.status as Record<string, unknown>) ?? {};
       const statusType = ((statusObj.type as Record<string, unknown>)?.name as string ?? "active").toLowerCase();
+
       const rounds: Record<number, number | null> = { 1: null, 2: null, 3: null, 4: null };
       linescores.forEach((ls, i) => {
         const l = ls as Record<string, unknown>;
-        const val = l.value as string;
-        rounds[i + 1] = (!val || val === "--") ? null : val === "E" ? 0 : parseInt(val) || null;
-      });
-      const headshotObj = athlete.headshot as Record<string, unknown> | undefined;
-      const rawScore = comp.score as string;
 
-      // Tee time — ESPN returns it as startDate (ISO) or teeTime string
+        // ESPN returns displayValue as the to-par string ("-4", "E", "+2")
+        // and value as raw strokes ("68", "72").
+        // Prefer displayValue; fall back to converting raw strokes with par.
+        const displayVal = l.displayValue as string | undefined;
+        const rawVal = l.value as string | undefined;
+
+        let toPar: number | null = null;
+
+        if (displayVal && displayVal !== "--" && displayVal !== "") {
+          toPar = displayVal === "E" ? 0 : parseInt(displayVal) || null;
+        } else if (rawVal && rawVal !== "--" && rawVal !== "") {
+          const strokes = parseInt(rawVal);
+          if (!isNaN(strokes)) {
+            // If the value looks like raw strokes (>30), convert using par
+            toPar = strokes > 30 ? strokes - par : strokes;
+          }
+        }
+
+        rounds[i + 1] = toPar;
+      });
+
+      const headshotObj = athlete.headshot as Record<string, unknown> | undefined;
+
+      // comp.score is cumulative to-par as string ("-8", "E", "+2", or occasionally raw total)
+      const rawScore = (comp.score as string ?? "").trim();
+      let totalScore = 0;
+      if (rawScore === "E" || rawScore === "") {
+        totalScore = 0;
+      } else {
+        const parsed = parseInt(rawScore);
+        if (!isNaN(parsed)) {
+          // If >30 it's probably raw total strokes — convert using rounds played
+          const roundsPlayed = Object.values(rounds).filter(r => r !== null).length;
+          totalScore = parsed > 30 && roundsPlayed > 0 ? parsed - par * roundsPlayed : parsed;
+        }
+      }
+
+      // Tee time
       let teeTime: string | null = null;
       const startDate = comp.startDate as string | undefined;
       if (startDate) {
         try {
-          // Convert UTC to US/Eastern (Augusta, GA) and format as h:mm AM/PM
-          const dt = new Date(startDate);
-          teeTime = dt.toLocaleTimeString("en-US", {
+          teeTime = new Date(startDate).toLocaleTimeString("en-US", {
             timeZone: "America/New_York",
             hour: "numeric", minute: "2-digit", hour12: true,
           });
         } catch { teeTime = null; }
       }
-      // Fallback: check teeTime field directly
-      if (!teeTime && (comp.teeTime as string)) {
-        teeTime = comp.teeTime as string;
-      }
+      if (!teeTime && (comp.teeTime as string)) teeTime = comp.teeTime as string;
 
-      // "Thru" field — how many holes completed or "F" for finished
-      const thru = (statusObj.thru as string | number | undefined);
+      // Thru
+      const thru = statusObj.thru as string | number | undefined;
       const thruStr = thru !== undefined && thru !== null ? String(thru) : null;
 
       players.push({
         name: athlete.displayName as string ?? "",
         espnId: String(athlete.id ?? ""),
         headshot: headshotObj?.href as string ?? null,
-        totalScore: rawScore === "E" ? 0 : parseInt(rawScore) || 0,
+        totalScore,
         position: ((statusObj as Record<string, unknown>).position as Record<string, unknown>)?.displayName as string ?? statusObj.displayValue as string ?? "",
         status: statusType.includes("cut") ? "cut" : statusType.includes("wd") ? "wd" : "active",
         r1: rounds[1], r2: rounds[2], r3: rounds[3], r4: rounds[4],
@@ -73,7 +111,7 @@ function parseESPN(data: unknown): GolferScore[] {
   return players;
 }
 
-async function fetchFromESPN(): Promise<GolferScore[]> {
+async function fetchFromESPN(tournamentId = "masters"): Promise<GolferScore[]> {
   const urls = [
     "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
     "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
@@ -83,7 +121,7 @@ async function fetchFromESPN(): Promise<GolferScore[]> {
     try {
       const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" });
       if (!res.ok) continue;
-      const parsed = parseESPN(await res.json());
+      const parsed = parseESPN(await res.json(), tournamentId);
       if (parsed.length > 0) return parsed;
     } catch { continue; }
   }
@@ -130,7 +168,7 @@ export async function GET(request: Request) {
     if (age < CACHE_MS) return NextResponse.json({ scores: cached.data, source: "cache" });
   }
 
-  const scores = await fetchFromESPN();
+  const scores = await fetchFromESPN(tournament);
   if (scores.length > 0) {
     await supabase.from("score_cache").upsert({
       tournament: `scores_${tournament}`,
