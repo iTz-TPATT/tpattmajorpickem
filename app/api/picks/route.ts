@@ -59,16 +59,17 @@ export async function POST(request: Request) {
   const supabase = createServerSupabase();
   const overrides = await getAdminOverrides(supabase);
 
-  // Use admin round override if set
-  const activeRound = (overrides.roundOverride as number) ?? getCurrentRound(tournament);
-
-  if (round !== activeRound) {
-    return NextResponse.json({ error: "Can only pick for the current round" }, { status: 400 });
+  // Allow picking for any round whose deadline hasn't passed yet.
+  // This means: during R1, players can already submit R2 picks.
+  // Admin skipDeadline override bypasses all deadline checks.
+  const deadlinePassed = !overrides.skipDeadline && isRoundRevealed(tournament, round);
+  if (deadlinePassed) {
+    return NextResponse.json({ error: "Pick deadline has passed for this round" }, { status: 400 });
   }
 
-  // Skip deadline check if admin override is active
-  if (!overrides.skipDeadline && isRoundRevealed(tournament, round)) {
-    return NextResponse.json({ error: "Pick deadline has passed for this round" }, { status: 400 });
+  // If admin has set a round override, only allow that specific round
+  if (overrides.roundOverride && round !== (overrides.roundOverride as number)) {
+    return NextResponse.json({ error: `Admin has locked picks to Round ${overrides.roundOverride}` }, { status: 400 });
   }
 
   // Check burned golfers

@@ -785,12 +785,13 @@ function MyPicksTab({
   onPicksChanged: () => void;
 }) {
   const round = currentRound;
-  // revealed = picks are locked (can't change), but we still SHOW the player list always.
-  // During live tournament with roundOverride set, always allow picking.
-  const roundDeadlinePassed = isRoundRevealed(tournament, round);
-  // Only lock if deadline passed AND admin hasn't given override access
+  // If current round is locked, show the NEXT round so users can submit ahead.
+  // e.g. during R1 (locked after 7am tee time), auto-show R2 picks form.
+  const currentRevealed = isRoundRevealed(tournament, round);
+  const displayRound = currentRevealed && round < 4 ? round + 1 : round;
+  const roundDeadlinePassed = isRoundRevealed(tournament, displayRound);
   const revealed = roundDeadlinePassed && !revealAll;
-  const revealDate = new Date(tournament.rounds[round as 1|2|3|4].revealTimeUTC);
+  const revealDate = new Date(tournament.rounds[displayRound as 1|2|3|4].revealTimeUTC);
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -802,12 +803,12 @@ function MyPicksTab({
 
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
 
-  // My picks for this round
-  const myCurrentPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === round).map((p) => p.golfer);
+  // My picks for the round being displayed
+  const myCurrentPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === displayRound).map((p) => p.golfer);
 
   // All golfers I've used in previous rounds (burned)
   const burnedSet = new Set(
-    allPicks.filter((p) => p.user_id === userId && p.round_number < round).map((p) => p.golfer)
+    allPicks.filter((p) => p.user_id === userId && p.round_number < displayRound).map((p) => p.golfer)
   );
 
   // Cut players (status !== 'active')
@@ -817,7 +818,7 @@ function MyPicksTab({
     setSelected(myCurrentPicks);
     setSaved(myCurrentPicks.length === 3);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPicks, userId, round]);
+  }, [allPicks, userId, displayRound]);
 
   useEffect(() => {
     const t = setInterval(() => setCountdown(fmtCountdown(revealDate)), 1000);
@@ -825,7 +826,7 @@ function MyPicksTab({
   }, [revealDate]);
 
   function toggle(g: string) {
-    if (revealed || burnedSet.has(g) || (round >= 3 && cutSet.has(g))) return;
+    if (revealed || burnedSet.has(g) || (displayRound >= 3 && cutSet.has(g))) return;
     if (selected.includes(g)) { setSelected(selected.filter((x) => x !== g)); setSaved(false); return; }
     if (selected.length >= 3) return;
     setSelected([...selected, g]); setSaved(false);
@@ -838,7 +839,7 @@ function MyPicksTab({
       const res = await fetch("/api/picks", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ tournament: tournament.id, round, golfers: selected }),
+        body: JSON.stringify({ tournament: tournament.id, round: displayRound, golfers: selected }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
@@ -867,7 +868,7 @@ function MyPicksTab({
       return a.totalScore - b.totalScore;
     });
 
-  const scoringNote = round <= 2
+  const scoringNote = displayRound <= 2
     ? "Lowest 2 of your 3 golfer scores count this round"
     : "All 3 of your golfer scores count this round";
 
@@ -878,7 +879,7 @@ function MyPicksTab({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
           <div>
             <h2 style={{ fontSize: 18, color: "var(--accent)", fontFamily: "Playfair Display, serif" }}>
-              {ROUND_LABELS[round]} {revealed ? "— Locked" : "— Open"}
+              {ROUND_LABELS[displayRound]} {revealed ? "— Locked" : "— Open"}
             </h2>
             <p style={{ fontSize: 13, color: "var(--cream-dim)", marginTop: 4, fontStyle: "italic" }}>{scoringNote}</p>
           </div>
@@ -981,7 +982,7 @@ function MyPicksTab({
                   score={gs}
                   selected={selected.includes(gs.name)}
                   burned={burnedSet.has(gs.name)}
-                  cut={round >= 3 && gs.status !== "active"}
+                  cut={displayRound >= 3 && gs.status !== "active"}
                   disabled={!selected.includes(gs.name) && selected.length >= 3}
                   odds={odds[gs.name] ?? odds[normalizeName(gs.name)] ?? ""}
                   espnId={gs.espnId}
@@ -1012,7 +1013,7 @@ function MyPicksTab({
       </div>
 
       {/* Prior rounds summary */}
-      {[1, 2, 3, 4].filter((r) => r < round && allPicks.some(p => p.round_number === r)).map((r) => {
+      {[1, 2, 3, 4].filter((r) => r < displayRound && allPicks.some(p => p.round_number === r)).map((r) => {
         const myPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === r).map((p) => p.golfer);
         if (!myPicks.length) return null;
         const roundScores = myPicks.map((g) => getRoundScore(scoreMap[g], r));
