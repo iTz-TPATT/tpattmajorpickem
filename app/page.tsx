@@ -1013,11 +1013,12 @@ function MyPicksTab({
             {myPicks.map((g, i) => {
               const sc = scoreMap[g];
               const rs = getRoundScore(sc, r);
-              // For R1/R2 drop the highest (worst) score. If tied, drop the last index.
-              // Build sorted indices by score descending, drop the first (worst)
-              const droppedIndex = r <= 2 && roundScores.length === 3
+              // Drop the worst (highest to-par) score only when all 3 picks have scores.
+              // If any pick hasn't played yet (null), nothing is crossed out.
+              const allScored = r <= 2 && roundScores.length === 3 && roundScores.every(s => s !== null);
+              const droppedIndex = allScored
                 ? roundScores
-                    .map((s, idx) => ({ s: s ?? 999, idx }))
+                    .map((s, idx) => ({ s: s as number, idx }))
                     .sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
                 : -1;
               const notCounted = droppedIndex === i;
@@ -1285,8 +1286,9 @@ function LeaderboardTab({
                   {Object.entries(u.rounds).map(([r, rd]) => {
                     const rNum = parseInt(r);
                     const roundScores = rd.picks.map((g) => getRoundScore(scoreMap[g], rNum));
-                    const droppedIdxLb = rNum <= 2 && roundScores.length === 3
-                      ? roundScores.map((s, idx) => ({ s: s ?? 999, idx })).sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
+                    const allScoredLb = rNum <= 2 && roundScores.length === 3 && roundScores.every(s => s !== null);
+                    const droppedIdxLb = allScoredLb
+                      ? roundScores.map((s, idx) => ({ s: s as number, idx })).sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
                       : -1;
 
                     return (
@@ -1373,8 +1375,9 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
             </div>
 
             {withScores.map((u, i) => {
-              const droppedIdxHist = r <= 2 && u.roundScores.length === 3
-                ? u.roundScores.map((s, idx) => ({ s: s ?? 999, idx })).sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
+              const allScoredHist = r <= 2 && u.roundScores.length === 3 && u.roundScores.every(s => s !== null);
+              const droppedIdxHist = allScoredHist
+                ? u.roundScores.map((s, idx) => ({ s: s as number, idx })).sort((a, b) => b.s - a.s || b.idx - a.idx)[0].idx
                 : -1;
               return (
                 <div key={u.username} style={{ marginBottom: 18 }}>

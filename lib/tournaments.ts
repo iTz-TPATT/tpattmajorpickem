@@ -199,10 +199,16 @@ export function isTournamentComplete(t: Tournament): boolean {
 }
 
 export function calcRoundScore(scores: (number|null)[], round: number): number {
+  // Filter out null (player hasn't played that round yet)
   const valid = scores.filter((s): s is number => s !== null);
   if (valid.length === 0) return 0;
-  if (round <= 2) return [...valid].sort((a,b) => a-b).slice(0,2).reduce((s,v) => s+v, 0);
-  return valid.reduce((s,v) => s+v, 0);
+  if (round <= 2) {
+    // Best 2 of up to 3: sort ascending (most negative = best to-par first)
+    // e.g. [-4, 0, +5] → take [-4, 0] → sum = -4
+    return [...valid].sort((a, b) => a - b).slice(0, 2).reduce((s, v) => s + v, 0);
+  }
+  // Rounds 3 & 4: all scores count
+  return valid.reduce((s, v) => s + v, 0);
 }
 
 export const ROUND_LABELS: Record<number, string> = {
