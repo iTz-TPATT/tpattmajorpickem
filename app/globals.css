@@ -124,8 +124,10 @@ img { max-width: 100%; height: auto; }
 }
 .ticker-track {
   display: flex;
+  flex-wrap: nowrap;
   white-space: nowrap;
-  animation: ticker-scroll 45s linear infinite;
+  width: max-content;
+  animation: ticker-scroll 55s linear infinite;
   will-change: transform;
 }
 .ticker-track:hover { animation-play-state: paused; }

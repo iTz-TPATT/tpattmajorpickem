@@ -12,6 +12,8 @@ interface GolferScore {
   name: string; espnId: string; headshot: string | null;
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
+  teeTime: string | null;
+  thru: string | null;
 }
 type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom";
 
@@ -378,59 +380,34 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
 
 // ─── Golfer Card ──────────────────────────────────────────────────────────────
 function GolferCard({
-  name,
-  score,
-  selected,
-  burned,
-  cut,
-  disabled,
-  odds,
-  espnId,
-  headshot,
-  onClick,
+  name, score, selected, burned, cut, disabled, odds, espnId, headshot, onClick,
 }: {
-  name: string;
-  score: GolferScore | undefined;
-  selected: boolean;
-  burned: boolean;
-  cut: boolean;
-  disabled: boolean;
-  odds: string;
-  espnId: string;
-  headshot: string | null;
+  name: string; score: GolferScore | undefined; selected: boolean; burned: boolean;
+  cut: boolean; disabled: boolean; odds: string; espnId: string; headshot: string | null;
   onClick: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const totalScore = score?.totalScore ?? null;
 
-  function handleMouseEnter() {
-    setStatsOpen(true);
-  }
+  // Desktop: hover to show stats
+  function handleMouseEnter() { setStatsOpen(true); }
+  function handleMouseLeave() { setStatsOpen(false); }
 
-  function handleMouseLeave() {
-    setStatsOpen(false);
-  }
-
+  // Mobile: long press to toggle stats
   function handleTouchStart() {
-    longPressTimer.current = setTimeout(() => {
-      setStatsOpen((prev) => !prev);
-    }, 500);
+    longPressTimer.current = setTimeout(() => setStatsOpen(prev => !prev), 500);
   }
-
   function handleTouchEnd() {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   }
 
+  // Close stats when tapping elsewhere
   useEffect(() => {
     if (!statsOpen) return;
-
     const close = () => setStatsOpen(false);
     document.addEventListener("touchstart", close, { once: true, capture: true });
-
-    return () => {
-      document.removeEventListener("touchstart", close, { capture: true });
-    };
+    return () => document.removeEventListener("touchstart", close, { capture: true });
   }, [statsOpen]);
 
   return (
@@ -445,173 +422,56 @@ function GolferCard({
         onClick={onClick}
         disabled={disabled || burned || cut}
         style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "10px 12px",
-          background: selected
-            ? "rgba(var(--accent-rgb, 201,168,76), 0.15)"
-            : burned || cut
-              ? "rgba(255,255,255,0.02)"
-              : "rgba(255,255,255,0.04)",
-          border: `1px solid ${
-            selected
-              ? "var(--accent)"
-              : burned || cut
-                ? "rgba(255,255,255,0.06)"
-                : "rgba(255,255,255,0.08)"
-          }`,
-          borderRadius: 8,
-          cursor: burned || cut || disabled ? "not-allowed" : "pointer",
-          opacity: burned || cut ? 0.45 : 1,
-          transition: "all 0.15s",
-          textAlign: "left",
+          width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+          background: selected ? "rgba(var(--accent-rgb, 201,168,76), 0.15)" : burned || cut ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${selected ? "var(--accent)" : burned || cut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.08)"}`,
+          borderRadius: 8, cursor: burned || cut || disabled ? "not-allowed" : "pointer",
+          opacity: burned || cut ? 0.45 : 1, transition: "all 0.15s", textAlign: "left",
         }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            overflow: "hidden",
-            flexShrink: 0,
-            background: "rgba(255,255,255,0.08)",
-          }}
-        >
+        {/* Headshot */}
+        <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)" }}>
           {headshot ? (
-            <img
-              src={headshot}
-              alt={name}
-              width={36}
-              height={36}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                objectPosition: "center 20%",
-              }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
+            
+            <img src={headshot} alt={name} width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           ) : (
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 14,
-                color: "var(--cream-dim)",
-              }}
-            >
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "var(--cream-dim)" }}>
               {name[0]}
             </div>
           )}
         </div>
 
+        {/* Name & badges */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div
-              style={{
-                fontSize: 14,
-                color: selected
-                  ? "var(--accent)"
-                  : burned || cut
-                    ? "var(--cream-dim)"
-                    : "var(--cream)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
+            <div style={{ fontSize: 14, color: selected ? "var(--accent)" : burned || cut ? "var(--cream-dim)" : "var(--cream)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {name}
             </div>
-
+            {/* Stats hint on mobile */}
             {espnId && !burned && !cut && (
-              <span
-                style={{
-                  fontSize: 9,
-                  color: "rgba(255,255,255,0.2)",
-                  flexShrink: 0,
-                }}
-              >
-                hold
-              </span>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>hold</span>
             )}
           </div>
-
           <div style={{ display: "flex", gap: 6, marginTop: 2, alignItems: "center" }}>
-            {burned && (
-              <span
-                style={{
-                  fontSize: 10,
-                  background: "rgba(255,255,255,0.08)",
-                  color: "var(--cream-dim)",
-                  padding: "1px 6px",
-                  borderRadius: 10,
-                  letterSpacing: "0.06em",
-                }}
-              >
-                USED
-              </span>
-            )}
-
-            {cut && (
-              <span
-                style={{
-                  fontSize: 10,
-                  background: "rgba(192,57,43,0.15)",
-                  color: "#e07b6f",
-                  padding: "1px 6px",
-                  borderRadius: 10,
-                  letterSpacing: "0.06em",
-                }}
-              >
-                CUT
-              </span>
-            )}
-
-            {odds && !burned && !cut && (
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--accent-light, var(--accent))",
-                  opacity: 0.8,
-                }}
-              >
-                {odds}
-              </span>
-            )}
-
-            {score?.position && !burned && !cut && (
-              <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>
-                {score.position}
-              </span>
+            {burned && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", color: "var(--cream-dim)", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>USED</span>}
+            {cut && <span style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "#e07b6f", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>CUT</span>}
+            {odds && !burned && !cut && <span style={{ fontSize: 11, color: "var(--accent-light, var(--accent))", opacity: 0.8 }}>{odds}</span>}
+            {score?.position && !burned && !cut && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+            {score?.teeTime && !burned && !cut && score.r1 === null && (
+              <span style={{ fontSize: 10, color: "rgba(201,168,76,0.7)", letterSpacing: "0.04em" }}>⏱ {score.teeTime}</span>
             )}
           </div>
         </div>
 
-        <div
-          style={{
-            fontSize: 15,
-            fontFamily: "monospace",
-            color: scoreColor(totalScore),
-            flexShrink: 0,
-          }}
-        >
+        {/* Score */}
+        <div style={{ fontSize: 15, fontFamily: "monospace", color: scoreColor(totalScore), flexShrink: 0 }}>
           {fmtScore(totalScore)}
         </div>
       </button>
 
+      {/* Stats tooltip — hover on desktop, long press on mobile */}
       {statsOpen && espnId && !burned && !cut && (
-        <StatsTooltip
-          espnId={espnId}
-          playerName={name}
-          visible={statsOpen}
-        />
+        <StatsTooltip espnId={espnId} playerName={name} visible={statsOpen} />
       )}
     </div>
   );
@@ -924,7 +784,8 @@ function MyPicksTab({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saved, setSaved] = useState(false);
-  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha">("leaderboard");
+  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha">("alpha");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
 
@@ -973,17 +834,25 @@ function MyPicksTab({
     finally { setSubmitting(false); }
   }
 
-  // Build sorted golfer list based on sortMode
-  const sortedGolfers = [...scores].sort((a, b) => {
-    const aAvail = !burnedSet.has(a.name) && a.status === "active";
-    const bAvail = !burnedSet.has(b.name) && b.status === "active";
-    // Always put unavailable (burned/cut) players at the bottom
-    if (aAvail && !bAvail) return -1;
-    if (!aAvail && bAvail) return 1;
-    // Within available: sort by selected mode
-    if (sortMode === "alpha") return a.name.localeCompare(b.name);
-    return a.totalScore - b.totalScore; // leaderboard order
-  });
+  // Build sorted golfer list based on sortMode, filtered by search
+  const sortedGolfers = [...scores]
+    .filter(s => {
+      if (!searchQuery.trim()) return true;
+      return s.name.toLowerCase().includes(searchQuery.toLowerCase());
+    })
+    .sort((a, b) => {
+      const aAvail = !burnedSet.has(a.name) && a.status === "active";
+      const bAvail = !burnedSet.has(b.name) && b.status === "active";
+      if (aAvail && !bAvail) return -1;
+      if (!aAvail && bAvail) return 1;
+      if (sortMode === "alpha") {
+        // Sort by first name
+        const aFirst = a.name.split(" ")[0] ?? a.name;
+        const bFirst = b.name.split(" ")[0] ?? b.name;
+        return aFirst.localeCompare(bFirst);
+      }
+      return a.totalScore - b.totalScore;
+    });
 
   const scoringNote = round <= 2
     ? "Lowest 2 of your 3 golfer scores count this round"
@@ -1037,9 +906,50 @@ function MyPicksTab({
         {!revealed && (
           <>
             <div style={{ height: 1, background: "var(--card-border)", margin: "12px 0" }} />
-            <p style={{ fontSize: 13, color: "var(--cream-dim)", marginBottom: 12 }}>
-              Pick 3 golfers. Hover for season stats. Grayed = already used or cut.
+
+            {/* Search + sort controls */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" as const }}>
+              {/* Search bar */}
+              <div style={{ flex: 1, minWidth: 160, position: "relative" as const }}>
+                <span style={{ position: "absolute" as const, left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "var(--cream-dim)", pointerEvents: "none" as const }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search players…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%", paddingLeft: 32, paddingRight: 10, paddingTop: 8, paddingBottom: 8,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid var(--card-border)",
+                    borderRadius: 8, color: "var(--cream)", fontSize: 14, outline: "none",
+                  }}
+                />
+              </div>
+              {/* Sort toggle */}
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                {(["alpha", "leaderboard"] as const).map(mode => (
+                  <button key={mode} onClick={() => setSortMode(mode)} style={{
+                    padding: "6px 10px", borderRadius: 6, fontSize: 12,
+                    background: sortMode === mode ? "var(--accent)" : "rgba(255,255,255,0.06)",
+                    color: sortMode === mode ? "var(--bg)" : "var(--cream-dim)",
+                    border: `1px solid ${sortMode === mode ? "var(--accent)" : "var(--card-border)"}`,
+                    cursor: "pointer", fontWeight: sortMode === mode ? 600 : 400,
+                  }}>
+                    {mode === "alpha" ? "A–Z" : "Rank"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <p style={{ fontSize: 12, color: "var(--cream-dim)", marginBottom: 10, fontStyle: "italic" }}>
+              Pick 3 golfers. Hover/hold for season stats. Grayed = already used or cut.
             </p>
+
+            {sortedGolfers.length === 0 && (
+              <p style={{ color: "var(--cream-dim)", fontSize: 14, textAlign: "center", padding: "16px 0" }}>
+                No players match &ldquo;{searchQuery}&rdquo;
+              </p>
+            )}
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
               {sortedGolfers.map((gs) => (
                 <GolferCard
@@ -1119,11 +1029,11 @@ function MyPicksTab({
 
 // ─── Leaderboard Tab ──────────────────────────────────────────────────────────
 function LeaderboardTab({
-  tournament, allPicks, scores, playerCount, registeredUsers, currentRound,
+  tournament, allPicks, scores, playerCount, registeredUsers, currentRound, pickStatus,
 }: {
   tournament: Tournament; allPicks: Pick[]; scores: GolferScore[];
   playerCount: number; registeredUsers: {id: string; username: string}[];
-  currentRound: number;
+  currentRound: number; pickStatus: Record<string, number[]>;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
@@ -1134,14 +1044,18 @@ function LeaderboardTab({
   registeredUsers.forEach((u) => { userMap[u.id] = u.username; });
   allPicks.forEach((p) => { userMap[p.user_id] = p.username; });
 
-  // Which users have submitted picks for the NEXT round (not yet locked)
+  // Use pickStatus (from /api/pick-status) which shows all rounds regardless of reveal time
+  // This ensures green checkmarks always reflect actual submission state
   const nextRound = currentRound + 1;
-  const submittedNextRound = new Set(
-    allPicks.filter(p => p.round_number === nextRound).map(p => p.user_id)
-  );
-  // Which users have submitted picks for the CURRENT round
   const submittedCurrentRound = new Set(
-    allPicks.filter(p => p.round_number === currentRound).map(p => p.user_id)
+    Object.entries(pickStatus)
+      .filter(([, rounds]) => rounds.includes(currentRound))
+      .map(([uid]) => uid)
+  );
+  const submittedNextRound = new Set(
+    Object.entries(pickStatus)
+      .filter(([, rounds]) => nextRound <= 4 && rounds.includes(nextRound))
+      .map(([uid]) => uid)
   );
 
   const standings = Object.entries(userMap).map(([uid, uname]) => {
@@ -1515,7 +1429,7 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
     return (
       <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 10, padding: 32, textAlign: "center" as const }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>⛳</div>
-        <div style={{ fontSize: 16, color: "var(--cream)", marginBottom: 8 }}>Tournament hasn't started yet</div>
+        <div style={{ fontSize: 16, color: "var(--cream)", marginBottom: 8 }}>Tournament hasn&apos;t started yet</div>
         <div style={{ fontSize: 13, color: "var(--cream-dim)" }}>Live leaderboard will appear here once Round 1 begins on April 9th.</div>
       </div>
     );
@@ -1533,7 +1447,8 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
       <div style={{
         background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
         border: "1px solid #2d6b40", borderRadius: "10px 10px 0 0",
-        display: "grid", gridTemplateColumns: "min(32px,8vw) 1fr min(34px,9vw) min(34px,9vw) min(34px,9vw) min(34px,9vw) min(46px,12vw)",
+        display: "grid",
+        gridTemplateColumns: "min(30px,7vw) 1fr min(30px,8vw) min(30px,8vw) min(30px,8vw) min(30px,8vw) min(42px,11vw)",
         padding: "8px 8px", gap: 2,
       }}>
         {["POS","PLAYER","R1","R2","R3","R4","TOTAL"].map(h => (
@@ -1551,8 +1466,8 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
             <div key={p.name} style={{ borderBottom: i < active.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
               <button onClick={() => setExpanded(isOpen ? null : p.name)} style={{
                 width: "100%", display: "grid",
-                gridTemplateColumns: "42px 1fr 48px 48px 48px 48px 64px",
-                alignItems: "center", padding: "11px 16px", gap: 4,
+                gridTemplateColumns: "min(30px,7vw) 1fr min(30px,8vw) min(30px,8vw) min(30px,8vw) min(30px,8vw) min(42px,11vw)",
+                alignItems: "center", padding: "11px 8px", gap: 2,
                 background: isLeader
                   ? "linear-gradient(90deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.04) 100%)"
                   : i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
@@ -1564,22 +1479,27 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
                   {isTied ? `T${i+1}` : `${i+1}`}
                 </div>
                 {/* Name + headshot */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflow: "hidden" }}>
                   {p.headshot ? (
                     <img src={p.headshot} alt={p.name}
-                      style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: isLeader ? "1px solid rgba(201,168,76,0.5)" : "1px solid rgba(255,255,255,0.1)" }}
+                      style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: isLeader ? "1px solid rgba(201,168,76,0.5)" : "1px solid rgba(255,255,255,0.1)" }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   ) : (
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
+                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
                   )}
-                  <div style={{ overflow: "hidden" }}>
-                    <div style={{ fontSize: 14, fontWeight: isLeader ? 600 : 400,
+                  <div style={{ minWidth: 0, overflow: "hidden" }}>
+                    <div style={{ fontSize: 13, fontWeight: isLeader ? 600 : 400,
                       color: isLeader ? "#c9a84c" : "#e8dcc8", fontFamily: "Playfair Display, serif",
-                      overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2 }}>
                       {p.name}
                     </div>
-                    
+                    {p.teeTime && p.r1 === null && (
+                      <div style={{ fontSize: 9, color: "rgba(201,168,76,0.65)", marginTop: 1, whiteSpace: "nowrap" }}>⏱ {p.teeTime}</div>
+                    )}
+                    {p.thru && p.r1 !== null && (
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 1, whiteSpace: "nowrap" }}>Thru {p.thru}</div>
+                    )}
                   </div>
                 </div>
                 {/* Round scores */}
@@ -2016,50 +1936,48 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 
 // ─── Round Leader Banner ──────────────────────────────────────────────────────
 // ─── Score Ticker ─────────────────────────────────────────────────────────────
+function tickerFmtScore(s: number) {
+  if (s === 0) return "E";
+  return s > 0 ? `+${s}` : `${s}`;
+}
+function tickerScoreColor(s: number) {
+  if (s < 0) return "#c0392b";
+  if (s === 0) return "rgba(255,255,255,0.7)";
+  return "rgba(255,255,255,0.4)";
+}
+function TickerItem({ p, pos }: { p: GolferScore; pos: number }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      padding: "0 18px", borderRight: "1px solid rgba(255,255,255,0.08)",
+      flexShrink: 0, whiteSpace: "nowrap",
+    }}>
+      <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace", minWidth: 16 }}>{pos + 1}</span>
+      <span style={{ fontSize: 12, color: "rgba(240,233,214,0.9)", letterSpacing: "0.02em" }}>
+        {p.name.split(" ").slice(-1)[0]}
+        {p.name.split(" ").length > 1 && (
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>, {p.name.split(" ")[0][0]}.</span>
+        )}
+      </span>
+      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: tickerScoreColor(p.totalScore) }}>
+        {tickerFmtScore(p.totalScore)}
+      </span>
+      {p.r1 !== null && p.r2 === null && (
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>R1</span>
+      )}
+    </span>
+  );
+}
+
 function ScoreTicker({ scores }: { scores: GolferScore[] }) {
   if (!scores.length) return null;
 
-  // Sort by total score, take top 30 active players
   const sorted = [...scores]
     .filter(s => s.status === "active")
     .sort((a, b) => a.totalScore - b.totalScore)
     .slice(0, 30);
 
   if (!sorted.length) return null;
-
-  function fmtScore(s: number) {
-    if (s === 0) return "E";
-    return s > 0 ? `+${s}` : `${s}`;
-  }
-
-  function scoreColor(s: number) {
-    if (s < 0) return "#c0392b";
-    if (s === 0) return "rgba(255,255,255,0.7)";
-    return "rgba(255,255,255,0.4)";
-  }
-
-  // Build one copy of items, then duplicate for seamless loop
-  const items = sorted.map((p, i) => (
-    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "0 18px", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
-      {/* Position */}
-      <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace", minWidth: 16 }}>{i + 1}</span>
-      {/* Name */}
-      <span style={{ fontSize: 12, color: "rgba(240,233,214,0.9)", letterSpacing: "0.02em" }}>
-        {p.name.split(" ").slice(-1)[0]}{/* Last name only */}
-        {p.name.split(" ").length > 1 && (
-          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>, {p.name.split(" ")[0][0]}.</span>
-        )}
-      </span>
-      {/* Score */}
-      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: scoreColor(p.totalScore) }}>
-        {fmtScore(p.totalScore)}
-      </span>
-      {/* Thru indicator if in progress */}
-      {(p.r1 !== null && p.r2 === null) && (
-        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>R1</span>
-      )}
-    </span>
-  ));
 
   return (
     <div className="ticker-wrap" style={{ padding: "5px 0" }}>
@@ -2074,11 +1992,11 @@ function ScoreTicker({ scores }: { scores: GolferScore[] }) {
           <span>⛳</span>
           <span>LIVE</span>
         </div>
-        {/* Scrolling track — duplicated for seamless loop */}
+        {/* Two independent copies with unique keys for seamless loop */}
         <div style={{ overflow: "hidden", flex: 1 }}>
           <div className="ticker-track">
-            <span>{items}</span>
-            <span>{items}</span>
+            {sorted.map((p, i) => <TickerItem key={`a-${i}`} p={p} pos={i} />)}
+            {sorted.map((p, i) => <TickerItem key={`b-${i}`} p={p} pos={i} />)}
           </div>
         </div>
       </div>
@@ -2301,6 +2219,7 @@ export default function Page() {
   const [adminOverrides, setAdminOverrides] = useState<{roundOverride?: number; revealAll?: boolean}>({});
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
+  const [pickStatus, setPickStatus] = useState<Record<string, number[]>>({});
   const [showSplash, setShowSplash] = useState(false);
   const [splashDone, setSplashDone] = useState(() => typeof window !== "undefined" && !!sessionStorage.getItem("mp_splash_shown"));
   const [musicMuted, setMusicMuted] = useState(true);
@@ -2363,27 +2282,36 @@ export default function Page() {
 
   const fetchData = useCallback(async (t: string) => {
     const tid = tournament.id;
-    const [picksRes, scoresRes, oddsRes, playersRes, usersRes, overridesRes] = await Promise.all([
-      fetch(`/api/picks?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` } }),
-      fetch(`/api/scores?tournament=${tid}`),
-      fetch(`/api/odds?tournament=${tid}`),
-      fetch("/api/players", { headers: { Authorization: `Bearer ${t}` } }),
-      fetch("/api/users", { headers: { Authorization: `Bearer ${t}` } }),
-      fetch("/api/overrides"),
-    ]);
-    if (picksRes.ok) setPicks((await picksRes.json()).picks ?? []);
-    if (scoresRes.ok) setScores((await scoresRes.json()).scores ?? []);
-    if (oddsRes.ok) setOdds((await oddsRes.json()).odds ?? {});
-    if (playersRes.ok) setPlayerCount((await playersRes.json()).count ?? 0);
-    if (usersRes.ok) setRegisteredUsers((await usersRes.json()).users ?? []);
-    if (overridesRes.ok) setAdminOverrides((await overridesRes.json()).overrides ?? {});
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s before giving up
+    try {
+      const [picksRes, scoresRes, oddsRes, playersRes, usersRes, overridesRes, pickStatusRes] = await Promise.all([
+        fetch(`/api/picks?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` }, signal: controller.signal }),
+        fetch(`/api/scores?tournament=${tid}`, { signal: controller.signal }),
+        fetch(`/api/odds?tournament=${tid}`, { signal: controller.signal }),
+        fetch("/api/players", { headers: { Authorization: `Bearer ${t}` }, signal: controller.signal }),
+        fetch("/api/users", { headers: { Authorization: `Bearer ${t}` }, signal: controller.signal }),
+        fetch("/api/overrides", { signal: controller.signal }),
+        fetch(`/api/pick-status?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` }, signal: controller.signal }),
+      ]);
+      if (picksRes.ok) setPicks((await picksRes.json()).picks ?? []);
+      if (scoresRes.ok) setScores((await scoresRes.json()).scores ?? []);
+      if (oddsRes.ok) setOdds((await oddsRes.json()).odds ?? {});
+      if (playersRes.ok) setPlayerCount((await playersRes.json()).count ?? 0);
+      if (usersRes.ok) setRegisteredUsers((await usersRes.json()).users ?? []);
+      if (overridesRes.ok) setAdminOverrides((await overridesRes.json()).overrides ?? {});
+      if (pickStatusRes.ok) setPickStatus((await pickStatusRes.json()).status ?? {});
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") console.warn("fetchData error:", err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }, [tournament.id]);
 
   useEffect(() => { if (token) fetchData(token); }, [token, fetchData]);
   useEffect(() => {
     if (!token) return;
-    const interval = setInterval(() => fetchData(token), 30 * 1000);
-    // Also refresh when user comes back to this tab
+    const interval = setInterval(() => fetchData(token), 2 * 60 * 1000); // 2 min refresh
     const onVisible = () => { if (document.visibilityState === "visible") fetchData(token); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
@@ -2480,7 +2408,7 @@ export default function Page() {
           <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} pickStatus={pickStatus} />
         )}
         {tab === "tournament" && (
           <TournamentLeaderboardTab scores={scores} />

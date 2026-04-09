@@ -7,6 +7,8 @@ export interface GolferScore {
   name: string; espnId: string; headshot: string | null;
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
+  teeTime: string | null; // e.g. "1:48 PM" local Augusta time
+  thru: string | null;    // e.g. "F" or "9" or "*3"
 }
 
 function parseESPN(data: unknown): GolferScore[] {
@@ -32,6 +34,29 @@ function parseESPN(data: unknown): GolferScore[] {
       });
       const headshotObj = athlete.headshot as Record<string, unknown> | undefined;
       const rawScore = comp.score as string;
+
+      // Tee time — ESPN returns it as startDate (ISO) or teeTime string
+      let teeTime: string | null = null;
+      const startDate = comp.startDate as string | undefined;
+      if (startDate) {
+        try {
+          // Convert UTC to US/Eastern (Augusta, GA) and format as h:mm AM/PM
+          const dt = new Date(startDate);
+          teeTime = dt.toLocaleTimeString("en-US", {
+            timeZone: "America/New_York",
+            hour: "numeric", minute: "2-digit", hour12: true,
+          });
+        } catch { teeTime = null; }
+      }
+      // Fallback: check teeTime field directly
+      if (!teeTime && (comp.teeTime as string)) {
+        teeTime = comp.teeTime as string;
+      }
+
+      // "Thru" field — how many holes completed or "F" for finished
+      const thru = (statusObj.thru as string | number | undefined);
+      const thruStr = thru !== undefined && thru !== null ? String(thru) : null;
+
       players.push({
         name: athlete.displayName as string ?? "",
         espnId: String(athlete.id ?? ""),
@@ -40,6 +65,8 @@ function parseESPN(data: unknown): GolferScore[] {
         position: ((statusObj as Record<string, unknown>).position as Record<string, unknown>)?.displayName as string ?? statusObj.displayValue as string ?? "",
         status: statusType.includes("cut") ? "cut" : statusType.includes("wd") ? "wd" : "active",
         r1: rounds[1], r2: rounds[2], r3: rounds[3], r4: rounds[4],
+        teeTime,
+        thru: thruStr,
       });
     }
   } catch (e) { console.error("ESPN parse error:", e); }

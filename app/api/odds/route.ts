@@ -2,124 +2,151 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { TOURNAMENTS, TournamentId } from "@/lib/tournaments";
 
-const CACHE_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_MS = 45 * 60 * 1000; // 45 min — refresh more often during live play
 
 function fmtAmericanOdds(n: number): string {
   if (n === undefined || n === null || isNaN(n)) return "";
   return n > 0 ? `+${n}` : `${n}`;
 }
 
-// The Odds API sport keys to try in order for each tournament
-const ODDS_SPORT_KEYS: Record<string, string[]> = {
-  masters: [
-    "golf_masters_tournament_winner",
-    "golf_pga_championship_winner", // fallback during off-week
-  ],
-  pga: [
-    "golf_pga_championship_winner",
-  ],
-  usopen: [
-    "golf_us_open_winner",
-    "golf_us_open_championship_winner",
-  ],
-  theopen: [
-    "golf_the_open_championship_winner",
-    "golf_british_open_championship_winner",
-  ],
+const SPORT_KEYS: Record<string, string> = {
+  masters: "golf_masters_tournament_winner",
+  pga:     "golf_pga_championship_winner",
+  usopen:  "golf_us_open_winner",
+  theopen: "golf_the_open_championship_winner",
 };
 
+const PREFERRED_BOOKS = ["draftkings", "fanduel", "betmgm", "williamhill_us", "bovada"];
 
-// Normalize player names for fuzzy matching
-// Handles "Rory McIlroy" vs "Rory Mcilroy", accents, etc.
 function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // strip accents (Åberg -> Aberg)
-    .replace(/[^a-z\s]/g, "")          // remove non-alpha
-    .replace(/\s+/g, " ")
-    .trim();
+  return name.toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z\s]/g, "")
+    .replace(/\s+/g, " ").trim();
 }
 
-// Build a normalized odds map so player name differences don't break lookup
-function buildNormalizedOddsMap(raw: Record<string, string>): Record<string, string> {
-  const normalized: Record<string, string> = {};
-  for (const [name, odds] of Object.entries(raw)) {
-    normalized[normalizeName(name)] = odds;
-  }
-  return normalized;
+function pickBookmaker(bookmakers: unknown[]): Record<string, unknown> | null {
+  const bk = bookmakers.find((b) => {
+    const x = b as Record<string, unknown>;
+    return PREFERRED_BOOKS.includes(x.key as string);
+  }) ?? bookmakers[0];
+  return (bk as Record<string, unknown>) ?? null;
 }
 
-async function fetchOddsFromAPI(apiKey: string, tournamentId: string): Promise<Record<string, string>> {
-  const sportKeys = ODDS_SPORT_KEYS[tournamentId] ?? [TOURNAMENTS[tournamentId as TournamentId]?.oddsKey];
-
-  for (const sportKey of sportKeys) {
-    try {
-      const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=us&markets=outrights&oddsFormat=american`;
-      const res = await fetch(url, { cache: "no-store" });
-
-      if (res.status === 404) continue; // Sport key not found, try next
-      if (!res.ok) {
-        console.error(`Odds API error for ${sportKey}: ${res.status}`);
-        continue;
-      }
-
-      const data = await res.json() as unknown[];
-      if (!Array.isArray(data) || data.length === 0) continue;
-
-      const oddsMap: Record<string, string> = {};
-
-      // Outrights market — each "game" is actually a list of outcomes (one per player)
-      for (const event of data) {
-        const e = event as Record<string, unknown>;
-        const bookmakers = (e.bookmakers as unknown[]) ?? [];
-
-        // Prefer DraftKings, then FanDuel, then first available
-        const preferred = ["draftkings", "fanduel", "betmgm", "williamhill_us"];
-        let bookmaker = bookmakers.find((b) => {
-          const bk = b as Record<string, unknown>;
-          return preferred.includes((bk.key as string) ?? "");
-        }) as Record<string, unknown> | undefined;
-
-        if (!bookmaker) bookmaker = bookmakers[0] as Record<string, unknown>;
-        if (!bookmaker) continue;
-
-        const markets = (bookmaker.markets as unknown[]) ?? [];
-        const market = markets[0] as Record<string, unknown>;
-        if (!market) continue;
-
-        for (const o of (market.outcomes as unknown[]) ?? []) {
-          const outcome = o as Record<string, unknown>;
-          const name = outcome.name as string;
-          const price = outcome.price as number;
-          if (name && price !== undefined && !oddsMap[name]) {
-            oddsMap[name] = fmtAmericanOdds(price);
-          }
+function extractFromEvents(data: unknown[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const event of data) {
+    const e = event as Record<string, unknown>;
+    const bookmakers = (e.bookmakers as unknown[]) ?? [];
+    const bk = pickBookmaker(bookmakers);
+    if (!bk) continue;
+    for (const mkt of (bk.markets as unknown[]) ?? []) {
+      const m = mkt as Record<string, unknown>;
+      for (const o of (m.outcomes as unknown[]) ?? []) {
+        const outcome = o as Record<string, unknown>;
+        const name = outcome.name as string;
+        const price = outcome.price as number;
+        if (name && price !== undefined && !out[name]) {
+          out[name] = fmtAmericanOdds(price);
         }
       }
-
-      if (Object.keys(oddsMap).length > 0) {
-        console.log(`Odds loaded from ${sportKey}: ${Object.keys(oddsMap).length} players`);
-        // Also add normalized name entries so lookups work regardless of casing/accents
-        for (const [name, odds] of Object.entries(oddsMap)) {
-          const norm = normalizeName(name);
-          if (!oddsMap[norm]) oddsMap[norm] = odds;
-        }
-        return oddsMap;
-      }
-    } catch (err) {
-      console.error(`Odds fetch error for ${sportKey}:`, err);
-      continue;
     }
   }
+  return out;
+}
 
-  return {};
+function addNormalizedKeys(map: Record<string, string>): Record<string, string> {
+  const copy = { ...map };
+  for (const [name, odds] of Object.entries(map)) {
+    const norm = normalizeName(name);
+    if (!copy[norm]) copy[norm] = odds;
+  }
+  return copy;
+}
+
+async function fetchLiveOdds(
+  apiKey: string, sportKey: string
+): Promise<{ odds: Record<string, string>; source: string } | null> {
+  // Step 1 — get list of live/in-play events for this sport
+  try {
+    const eventsUrl =
+      `https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${apiKey}&dateFormat=iso`;
+    const evRes = await fetch(eventsUrl, { cache: "no-store" });
+    if (!evRes.ok) return null;
+
+    const events = await evRes.json() as unknown[];
+    if (!Array.isArray(events) || !events.length) return null;
+
+    // Find an event that is currently live (commenced but not completed)
+    const now = Date.now();
+    const liveEvent = events.find((ev) => {
+      const e = ev as Record<string, unknown>;
+      const start = new Date(e.commence_time as string).getTime();
+      return start <= now && !(e.completed as boolean);
+    }) as Record<string, unknown> | undefined;
+
+    if (!liveEvent) return null;
+
+    const eventId = liveEvent.id as string;
+
+    // Step 2 — fetch odds for that specific live event
+    const oddsUrl =
+      `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${eventId}/odds?apiKey=${apiKey}&regions=us&markets=outrights&oddsFormat=american`;
+    const oddsRes = await fetch(oddsUrl, { cache: "no-store" });
+    if (!oddsRes.ok) return null;
+
+    const oddsData = await oddsRes.json() as Record<string, unknown>;
+    // Event-level endpoint returns a single object, not array
+    const bookmakers = (oddsData.bookmakers as unknown[]) ?? [];
+    if (!bookmakers.length) return null;
+
+    const bk = pickBookmaker(bookmakers);
+    if (!bk) return null;
+
+    const liveOdds: Record<string, string> = {};
+    for (const mkt of (bk.markets as unknown[]) ?? []) {
+      const m = mkt as Record<string, unknown>;
+      for (const o of (m.outcomes as unknown[]) ?? []) {
+        const outcome = o as Record<string, unknown>;
+        const name = outcome.name as string;
+        const price = outcome.price as number;
+        if (name && price !== undefined && !liveOdds[name]) {
+          liveOdds[name] = fmtAmericanOdds(price);
+        }
+      }
+    }
+
+    if (!Object.keys(liveOdds).length) return null;
+    return { odds: addNormalizedKeys(liveOdds), source: "live_event" };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPreMarketOdds(
+  apiKey: string, sportKey: string
+): Promise<{ odds: Record<string, string>; source: string } | null> {
+  const markets = ["outrights", "h2h", "winner"];
+  for (const market of markets) {
+    try {
+      const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=us&markets=${market}&oddsFormat=american`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) continue;
+      const data = await res.json() as unknown[];
+      if (!Array.isArray(data) || !data.length) continue;
+      const odds = extractFromEvents(data);
+      if (Object.keys(odds).length > 0) {
+        return { odds: addNormalizedKeys(odds), source: `pre_market_${market}` };
+      }
+    } catch { continue; }
+  }
+  return null;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tournamentId = (searchParams.get("tournament") ?? "masters") as TournamentId;
   const debug = searchParams.get("debug") === "1";
+  const bust  = searchParams.get("bust")  === "1";
 
   const tournament = TOURNAMENTS[tournamentId];
   if (!tournament) return NextResponse.json({ odds: {} });
@@ -127,44 +154,51 @@ export async function GET(request: Request) {
   const supabase = createServerSupabase();
   const cacheKey = `odds_${tournamentId}`;
 
-  // Check cache first
   const { data: cached } = await supabase
-    .from("score_cache")
-    .select("data, updated_at")
-    .eq("tournament", cacheKey)
-    .single();
+    .from("score_cache").select("data, updated_at").eq("tournament", cacheKey).single();
 
-  if (cached && !debug) {
+  // Serve fresh non-empty cache (skip on debug/bust)
+  if (cached && !debug && !bust) {
     const age = Date.now() - new Date(cached.updated_at as string).getTime();
-    if (age < CACHE_MS) {
-      return NextResponse.json({ odds: cached.data, source: "cache" });
+    const cachedOdds = (cached.data ?? {}) as Record<string, string>;
+    if (age < CACHE_MS && Object.keys(cachedOdds).length > 0) {
+      return NextResponse.json({ odds: cachedOdds, source: "cache", age_minutes: Math.round(age / 60000) });
     }
   }
 
   const apiKey = process.env.ODDS_API_KEY;
-
   if (!apiKey) {
-    console.warn("ODDS_API_KEY not set — odds will be empty");
-    return NextResponse.json({
-      odds: cached?.data ?? {},
-      source: "no_api_key",
-    });
+    return NextResponse.json({ odds: (cached?.data ?? {}) as Record<string, string>, source: "no_api_key" });
   }
 
-  const oddsMap = await fetchOddsFromAPI(apiKey, tournamentId);
+  const sportKey = SPORT_KEYS[tournamentId] ?? TOURNAMENTS[tournamentId as TournamentId]?.oddsKey;
 
-  if (Object.keys(oddsMap).length > 0) {
+  // Try live event odds first, then fall back to pre-market
+  const result =
+    (await fetchLiveOdds(apiKey, sportKey)) ??
+    (await fetchPreMarketOdds(apiKey, sportKey));
+
+  if (result && Object.keys(result.odds).length > 0) {
     await supabase.from("score_cache").upsert({
       tournament: cacheKey,
-      data: oddsMap,
+      data: result.odds,
       updated_at: new Date().toISOString(),
     });
-    return NextResponse.json({ odds: oddsMap, source: "live" });
+
+    const resp: Record<string, unknown> = {
+      odds: result.odds,
+      source: result.source,
+      count: Object.keys(result.odds).length,
+    };
+    if (debug) resp.sportKey = sportKey;
+    return NextResponse.json(resp);
   }
 
-  // Return stale cache if live fetch returned nothing
-  return NextResponse.json({
-    odds: cached?.data ?? {},
-    source: Object.keys(cached?.data ?? {}).length > 0 ? "stale_cache" : "empty",
-  });
+  // Nothing live or pre-market — serve stale cache (never cache empty)
+  const stale = (cached?.data ?? {}) as Record<string, string>;
+  const staleSource = Object.keys(stale).length > 0 ? "stale_cache" : "empty";
+  if (debug) {
+    return NextResponse.json({ odds: stale, source: staleSource, sportKey, hint: "Both live and pre-market returned 0 players. Check sportKey and that ODDS_API_KEY is valid." });
+  }
+  return NextResponse.json({ odds: stale, source: staleSource });
 }
