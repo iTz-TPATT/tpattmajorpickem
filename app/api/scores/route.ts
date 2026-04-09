@@ -97,38 +97,45 @@ function parseESPN(data: unknown, tournamentId = "masters"): GolferScore[] {
 }
 
 // Try multiple ESPN endpoints with different headers to maximize success rate
+async function fetchESPN(url: string, headers: Record<string, string>): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000); // 6s max per attempt
+  try {
+    return await fetch(url, { headers, cache: "no-store", signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchFromESPN(tournamentId = "masters"): Promise<{ scores: GolferScore[]; log: string[] }> {
   const log: string[] = [];
+  // Primary: current PGA event (fastest — no event ID lookup needed)
+  // Fallback: specific Masters 2026 event ID
   const attempts: { url: string; headers: Record<string, string> }[] = [
     {
-      url: "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
-      headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15" },
-    },
-    {
       url: "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
     },
     {
       url: "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
-      headers: { "Accept": "application/json" },
+      headers: { "User-Agent": "Mozilla/5.0" },
     },
   ];
 
   for (const attempt of attempts) {
     try {
-      log.push(`Trying: ${attempt.url.slice(0, 80)}`);
-      const res = await fetch(attempt.url, {
-        headers: attempt.headers,
-        cache: "no-store",
-      });
-      log.push(`  → HTTP ${res.status}`);
+      const start = Date.now();
+      log.push(`GET ${attempt.url.slice(0, 80)}`);
+      const res = await fetchESPN(attempt.url, attempt.headers);
+      log.push(`  → HTTP ${res.status} (${Date.now() - start}ms)`);
       if (!res.ok) continue;
       const json = await res.json();
       const parsed = parseESPN(json, tournamentId);
       log.push(`  → ${parsed.length} players parsed`);
       if (parsed.length > 0) return { scores: parsed, log };
     } catch (e) {
-      log.push(`  → ERROR: ${String(e).slice(0, 100)}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      log.push(`  → ${msg.includes("abort") ? "TIMED OUT (6s)" : `ERROR: ${msg.slice(0, 80)}`}`);
     }
   }
   return { scores: [], log };
