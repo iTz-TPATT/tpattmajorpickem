@@ -849,10 +849,8 @@ export default function AdminPage() {
               } catch { setOddsDebug("❌ Network error fetching odds"); }
             }} style={S.btn("blue")}>🔍 Test Odds API</button>
             <button onClick={async () => {
-              try {
-                await fetch("/api/odds?tournament=masters&debug=1");
-                setOddsDebug("Cache cleared — next page load will re-fetch from The Odds API");
-              } catch { setOddsDebug("Error"); }
+              const ok = await call("clear_odds_cache");
+              if (ok) setOddsDebug("✓ Odds cache cleared — click Test Odds API to re-fetch live odds.");
             }} style={S.btn("yellow")}>↺ Clear Odds Cache</button>
           </div>
           {oddsDebug && (

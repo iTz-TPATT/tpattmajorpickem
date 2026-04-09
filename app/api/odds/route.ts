@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { TOURNAMENTS, TournamentId } from "@/lib/tournaments";
 
-const CACHE_MS = 45 * 60 * 1000; // 45 min — refresh more often during live play
+const CACHE_MS = 45 * 60 * 1000;
 
-function fmtAmericanOdds(n: number): string {
+function fmtOdds(n: number): string {
   if (n === undefined || n === null || isNaN(n)) return "";
   return n > 0 ? `+${n}` : `${n}`;
 }
@@ -17,6 +17,7 @@ const SPORT_KEYS: Record<string, string> = {
 };
 
 const PREFERRED_BOOKS = ["draftkings", "fanduel", "betmgm", "williamhill_us", "bovada"];
+const MARKETS = ["outrights", "h2h", "winner"];
 
 function normalizeName(name: string): string {
   return name.toLowerCase().normalize("NFD")
@@ -25,36 +26,31 @@ function normalizeName(name: string): string {
 }
 
 function pickBookmaker(bookmakers: unknown[]): Record<string, unknown> | null {
-  const bk = bookmakers.find((b) => {
+  return (bookmakers.find((b) => {
     const x = b as Record<string, unknown>;
     return PREFERRED_BOOKS.includes(x.key as string);
-  }) ?? bookmakers[0];
-  return (bk as Record<string, unknown>) ?? null;
+  }) ?? bookmakers[0] ?? null) as Record<string, unknown> | null;
 }
 
-function extractFromEvents(data: unknown[]): Record<string, string> {
+function extractOdds(bookmakers: unknown[]): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const event of data) {
-    const e = event as Record<string, unknown>;
-    const bookmakers = (e.bookmakers as unknown[]) ?? [];
-    const bk = pickBookmaker(bookmakers);
-    if (!bk) continue;
-    for (const mkt of (bk.markets as unknown[]) ?? []) {
-      const m = mkt as Record<string, unknown>;
-      for (const o of (m.outcomes as unknown[]) ?? []) {
-        const outcome = o as Record<string, unknown>;
-        const name = outcome.name as string;
-        const price = outcome.price as number;
-        if (name && price !== undefined && !out[name]) {
-          out[name] = fmtAmericanOdds(price);
-        }
+  const bk = pickBookmaker(bookmakers);
+  if (!bk) return out;
+  for (const mkt of (bk.markets as unknown[]) ?? []) {
+    const m = mkt as Record<string, unknown>;
+    for (const o of (m.outcomes as unknown[]) ?? []) {
+      const outcome = o as Record<string, unknown>;
+      const name = outcome.name as string;
+      const price = outcome.price as number;
+      if (name && price !== undefined && !out[name]) {
+        out[name] = fmtOdds(price);
       }
     }
   }
   return out;
 }
 
-function addNormalizedKeys(map: Record<string, string>): Record<string, string> {
+function addNormalized(map: Record<string, string>): Record<string, string> {
   const copy = { ...map };
   for (const [name, odds] of Object.entries(map)) {
     const norm = normalizeName(name);
@@ -63,89 +59,91 @@ function addNormalizedKeys(map: Record<string, string>): Record<string, string> 
   return copy;
 }
 
-async function fetchLiveOdds(
-  apiKey: string, sportKey: string
-): Promise<{ odds: Record<string, string>; source: string } | null> {
-  // Step 1 — get list of live/in-play events for this sport
+async function fetchAllOdds(
+  apiKey: string,
+  sportKey: string
+): Promise<{ odds: Record<string, string>; source: string; log: string[] }> {
+  const log: string[] = [];
+
+  // ── Step 1: try live event-level endpoint ──────────────────────────────────
   try {
-    const eventsUrl =
-      `https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${apiKey}&dateFormat=iso`;
-    const evRes = await fetch(eventsUrl, { cache: "no-store" });
-    if (!evRes.ok) return null;
+    const evUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${apiKey}`;
+    log.push(`GET ${evUrl.replace(apiKey, "***")}`);
+    const evRes = await fetch(evUrl, { cache: "no-store" });
+    log.push(`  → HTTP ${evRes.status}`);
 
-    const events = await evRes.json() as unknown[];
-    if (!Array.isArray(events) || !events.length) return null;
+    if (evRes.ok) {
+      const events = await evRes.json() as unknown[];
+      log.push(`  → ${events.length} events`);
 
-    // Find the best candidate event: prefer in-progress (started, not completed),
-    // but fall back to the most recently started event regardless of completed flag.
-    const now = Date.now();
-    const started = events.filter((ev) => {
-      const e = ev as Record<string, unknown>;
-      return new Date(e.commence_time as string).getTime() <= now;
-    }) as Record<string, unknown>[];
+      const now = Date.now();
+      const started = (events as Record<string, unknown>[])
+        .filter(e => new Date(e.commence_time as string).getTime() <= now)
+        .sort((a, b) =>
+          new Date(b.commence_time as string).getTime() -
+          new Date(a.commence_time as string).getTime()
+        );
 
-    const liveEvent: Record<string, unknown> | undefined =
-      started.find(e => !e.completed) ??    // prefer in-progress
-      started.sort((a, b) =>                // fall back to most recent
-        new Date(b.commence_time as string).getTime() - new Date(a.commence_time as string).getTime()
-      )[0];
+      log.push(`  → ${started.length} events already started`);
 
-    if (!liveEvent) return null;
+      const candidate = started.find(e => !e.completed) ?? started[0];
+      if (candidate) {
+        const eventId = candidate.id as string;
+        log.push(`  → Using event: ${candidate.home_team ?? eventId} (completed=${candidate.completed})`);
 
-    const eventId = liveEvent.id as string;
+        const oUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${eventId}/odds?apiKey=${apiKey}&regions=us&markets=outrights&oddsFormat=american`;
+        log.push(`GET /events/${eventId}/odds`);
+        const oRes = await fetch(oUrl, { cache: "no-store" });
+        log.push(`  → HTTP ${oRes.status}`);
 
-    // Step 2 — fetch odds for that specific live event
-    const oddsUrl =
-      `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${eventId}/odds?apiKey=${apiKey}&regions=us&markets=outrights&oddsFormat=american`;
-    const oddsRes = await fetch(oddsUrl, { cache: "no-store" });
-    if (!oddsRes.ok) return null;
-
-    const oddsData = await oddsRes.json() as Record<string, unknown>;
-    // Event-level endpoint returns a single object, not array
-    const bookmakers = (oddsData.bookmakers as unknown[]) ?? [];
-    if (!bookmakers.length) return null;
-
-    const bk = pickBookmaker(bookmakers);
-    if (!bk) return null;
-
-    const liveOdds: Record<string, string> = {};
-    for (const mkt of (bk.markets as unknown[]) ?? []) {
-      const m = mkt as Record<string, unknown>;
-      for (const o of (m.outcomes as unknown[]) ?? []) {
-        const outcome = o as Record<string, unknown>;
-        const name = outcome.name as string;
-        const price = outcome.price as number;
-        if (name && price !== undefined && !liveOdds[name]) {
-          liveOdds[name] = fmtAmericanOdds(price);
+        if (oRes.ok) {
+          const oData = await oRes.json() as Record<string, unknown>;
+          const bookmakers = (oData.bookmakers as unknown[]) ?? [];
+          log.push(`  → ${bookmakers.length} bookmakers`);
+          const odds = extractOdds(bookmakers);
+          log.push(`  → ${Object.keys(odds).length} players extracted`);
+          if (Object.keys(odds).length > 0) {
+            return { odds: addNormalized(odds), source: "live_event", log };
+          }
         }
+      } else {
+        log.push("  → No started events found — trying pre-market");
       }
     }
-
-    if (!Object.keys(liveOdds).length) return null;
-    return { odds: addNormalizedKeys(liveOdds), source: "live_event" };
-  } catch {
-    return null;
+  } catch (e) {
+    log.push(`  EXCEPTION: ${String(e)}`);
   }
-}
 
-async function fetchPreMarketOdds(
-  apiKey: string, sportKey: string
-): Promise<{ odds: Record<string, string>; source: string } | null> {
-  const markets = ["outrights", "h2h", "winner"];
-  for (const market of markets) {
+  // ── Step 2: try standard outrights / market endpoints ─────────────────────
+  for (const market of MARKETS) {
     try {
       const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=us&markets=${market}&oddsFormat=american`;
+      log.push(`GET /odds?markets=${market}`);
       const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) continue;
+      log.push(`  → HTTP ${res.status}`);
+
+      if (res.status === 422 || res.status === 404) continue;
+      if (!res.ok) { log.push(`  → body: ${await res.text().catch(() => "")}`); continue; }
+
       const data = await res.json() as unknown[];
+      log.push(`  → ${Array.isArray(data) ? data.length : "not-array"} events`);
       if (!Array.isArray(data) || !data.length) continue;
-      const odds = extractFromEvents(data);
-      if (Object.keys(odds).length > 0) {
-        return { odds: addNormalizedKeys(odds), source: `pre_market_${market}` };
+
+      const odds: Record<string, string> = {};
+      for (const event of data) {
+        const e = event as Record<string, unknown>;
+        Object.assign(odds, extractOdds((e.bookmakers as unknown[]) ?? []));
       }
-    } catch { continue; }
+      log.push(`  → ${Object.keys(odds).length} players extracted`);
+      if (Object.keys(odds).length > 0) {
+        return { odds: addNormalized(odds), source: `pre_market_${market}`, log };
+      }
+    } catch (e) {
+      log.push(`  EXCEPTION: ${String(e)}`);
+    }
   }
-  return null;
+
+  return { odds: {}, source: "no_results", log };
 }
 
 export async function GET(request: Request) {
@@ -163,7 +161,7 @@ export async function GET(request: Request) {
   const { data: cached } = await supabase
     .from("score_cache").select("data, updated_at").eq("tournament", cacheKey).single();
 
-  // Serve fresh non-empty cache (skip on debug/bust)
+  // Serve fresh non-empty cache (skip when debug or bust)
   if (cached && !debug && !bust) {
     const age = Date.now() - new Date(cached.updated_at as string).getTime();
     const cachedOdds = (cached.data ?? {}) as Record<string, string>;
@@ -174,37 +172,33 @@ export async function GET(request: Request) {
 
   const apiKey = process.env.ODDS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ odds: (cached?.data ?? {}) as Record<string, string>, source: "no_api_key" });
+    return NextResponse.json({
+      odds: (cached?.data ?? {}) as Record<string, string>,
+      source: "no_api_key",
+      debugInfo: ["ODDS_API_KEY is not set in Vercel environment variables."],
+    });
   }
 
-  const sportKey = SPORT_KEYS[tournamentId] ?? TOURNAMENTS[tournamentId as TournamentId]?.oddsKey;
+  const sportKey = SPORT_KEYS[tournamentId] ?? tournament.oddsKey;
+  const { odds, source, log } = await fetchAllOdds(apiKey, sportKey);
 
-  // Try live event odds first, then fall back to pre-market
-  const result =
-    (await fetchLiveOdds(apiKey, sportKey)) ??
-    (await fetchPreMarketOdds(apiKey, sportKey));
-
-  if (result && Object.keys(result.odds).length > 0) {
+  if (Object.keys(odds).length > 0) {
     await supabase.from("score_cache").upsert({
       tournament: cacheKey,
-      data: result.odds,
+      data: odds,
       updated_at: new Date().toISOString(),
     });
-
-    const resp: Record<string, unknown> = {
-      odds: result.odds,
-      source: result.source,
-      count: Object.keys(result.odds).length,
-    };
-    if (debug) resp.sportKey = sportKey;
+    const resp: Record<string, unknown> = { odds, source, count: Object.keys(odds).length };
+    if (debug) resp.debugInfo = log;
     return NextResponse.json(resp);
   }
 
-  // Nothing live or pre-market — serve stale cache (never cache empty)
+  // Nothing returned — serve stale cache but NEVER cache empty
   const stale = (cached?.data ?? {}) as Record<string, string>;
-  const staleSource = Object.keys(stale).length > 0 ? "stale_cache" : "empty";
-  if (debug) {
-    return NextResponse.json({ odds: stale, source: staleSource, sportKey, hint: "Both live and pre-market returned 0 players. Check sportKey and that ODDS_API_KEY is valid." });
-  }
-  return NextResponse.json({ odds: stale, source: staleSource });
+  const resp: Record<string, unknown> = {
+    odds: stale,
+    source: Object.keys(stale).length > 0 ? "stale_cache" : "empty",
+  };
+  if (debug) resp.debugInfo = log;
+  return NextResponse.json(resp);
 }

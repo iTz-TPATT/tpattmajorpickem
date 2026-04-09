@@ -91,6 +91,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === "clear_odds_cache") {
+    await supabase.from("score_cache")
+      .delete()
+      .eq("tournament", "odds_masters");
+    return NextResponse.json({ success: true });
+  }
+
 
   // ── Submit picks on behalf of a user ──
   if (action === "submit_picks_as_user") {
