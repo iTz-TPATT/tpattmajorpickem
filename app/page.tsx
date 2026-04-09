@@ -2303,7 +2303,13 @@ export default function Page() {
   const fetchData = useCallback(async (t: string) => {
     const tid = tournament.id;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s before giving up
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+    async function safeJson<T>(res: Response, fallback: T): Promise<T> {
+      try { return res.ok ? await res.json() : fallback; }
+      catch { return fallback; }
+    }
+
     try {
       const [picksRes, scoresRes, oddsRes, playersRes, usersRes, overridesRes, pickStatusRes] = await Promise.all([
         fetch(`/api/picks?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` }, signal: controller.signal }),
@@ -2314,13 +2320,25 @@ export default function Page() {
         fetch("/api/overrides", { signal: controller.signal }),
         fetch(`/api/pick-status?tournament=${tid}`, { headers: { Authorization: `Bearer ${t}` }, signal: controller.signal }),
       ]);
-      if (picksRes.ok) setPicks((await picksRes.json()).picks ?? []);
-      if (scoresRes.ok) setScores((await scoresRes.json()).scores ?? []);
-      if (oddsRes.ok) setOdds((await oddsRes.json()).odds ?? {});
-      if (playersRes.ok) setPlayerCount((await playersRes.json()).count ?? 0);
-      if (usersRes.ok) setRegisteredUsers((await usersRes.json()).users ?? []);
-      if (overridesRes.ok) setAdminOverrides((await overridesRes.json()).overrides ?? {});
-      if (pickStatusRes.ok) setPickStatus((await pickStatusRes.json()).status ?? {});
+
+      // Parse each response independently — one bad response cannot blank others
+      const [picksData, scoresData, oddsData, playersData, usersData, overridesData, pickStatusData] = await Promise.all([
+        safeJson(picksRes,     { picks: [] }),
+        safeJson(scoresRes,    { scores: [] }),
+        safeJson(oddsRes,      { odds: {} }),
+        safeJson(playersRes,   { count: 0 }),
+        safeJson(usersRes,     { users: [] }),
+        safeJson(overridesRes, { overrides: {} }),
+        safeJson(pickStatusRes, { status: {} }),
+      ]);
+
+      setPicks(picksData.picks ?? []);
+      setScores(scoresData.scores ?? []);
+      setOdds(oddsData.odds ?? {});
+      setPlayerCount(playersData.count ?? 0);
+      setRegisteredUsers(usersData.users ?? []);
+      setAdminOverrides(overridesData.overrides ?? {});
+      setPickStatus(pickStatusData.status ?? {});
     } catch (err) {
       if ((err as Error).name !== "AbortError") console.warn("fetchData error:", err);
     } finally {

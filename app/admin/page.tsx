@@ -449,6 +449,14 @@ export default function AdminPage() {
         {/* ── Live DB Status ── */}
         <div style={{ background: "#0a0a0a", border: "1px solid #222", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.08em", marginBottom: 10 }}>📡 LIVE DB STATE — what the app actually sees right now</div>
+
+          {/* ⚠ Warning banner if useManualScores is ON but scores are blank */}
+          {overrides.useManualScores && (
+            <div style={{ background: "rgba(240,192,64,0.12)", border: "1px solid rgba(240,192,64,0.4)", borderRadius: 6, padding: "10px 14px", marginBottom: 10, fontSize: 12, color: "#f0c040" }}>
+              ⚠ Manual Scores is ON — ESPN scores are blocked. If the scoreboard is blank, click <strong>↺ Clear All Overrides</strong> below to restore live ESPN scores.
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
             {([
               { label: "Reveal All", key: "revealAll" as keyof Overrides, desc: "Other users' picks visible" },
@@ -470,6 +478,28 @@ export default function AdminPage() {
               );
             })}
           </div>
+
+          {/* Round advance buttons */}
+          <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 6, border: "1px solid #222" }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>🏌️ ADVANCE ROUND — use after each round&apos;s tee times start</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+              {[1, 2, 3, 4].map(r => (
+                <button key={r} onClick={() => saveOverrides({ ...overrides, roundOverride: r, skipDeadline: true, revealAll: r > 1 })}
+                  style={{ background: overrides.roundOverride === r ? "rgba(240,192,64,0.2)" : "rgba(255,255,255,0.04)", border: `1px solid ${overrides.roundOverride === r ? "#f0c040" : "#333"}`, color: overrides.roundOverride === r ? "#f0c040" : "#888", fontSize: 12, borderRadius: 4, padding: "5px 14px", cursor: "pointer" }}>
+                  R{r}
+                </button>
+              ))}
+              <button onClick={() => saveOverrides({ ...overrides, roundOverride: undefined })}
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #333", color: "#666", fontSize: 12, borderRadius: 4, padding: "5px 14px", cursor: "pointer" }}>
+                Auto (no override)
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#555", marginTop: 6 }}>
+              Current auto-round: <span style={{ color: "#aaa" }}>R{(() => { const now = new Date(); for (let r = 1; r <= 4; r++) { const t = new Date(tournament.rounds[r as 1|2|3|4].revealTimeUTC); if (now < t) return r; } return 4; })()}</span>
+              {" "}· Override: <span style={{ color: overrides.roundOverride ? "#f0c040" : "#555" }}>{overrides.roundOverride ? `R${overrides.roundOverride}` : "none"}</span>
+            </div>
+          </div>
+
           <div style={{ marginTop: 10, fontSize: 11, color: "#555", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
             <span>All 3 required for testing:</span>
             <span style={{ color: overrides.revealAll ? "#5dba7e" : "#e07b6f" }}>{overrides.revealAll ? "✓" : "✗"} Reveal All</span>
