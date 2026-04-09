@@ -59,88 +59,88 @@ function addNormalized(map: Record<string, string>): Record<string, string> {
   return copy;
 }
 
-async function fetchAllOdds(
-  apiKey: string,
-  sportKey: string
-): Promise<{ odds: Record<string, string>; source: string; log: string[] }> {
+type FetchOddsResult = {
+  odds: Record<string, string>;
+  source: string;
+  log: string[];
+  quotaExceeded?: boolean;
+};
+
+async function fetchAllOdds(apiKey: string, sportKey: string): Promise<FetchOddsResult> {
   const log: string[] = [];
 
-  // ── Step 1: try live event-level endpoint ──────────────────────────────────
+  async function checkQuota(res: Response): Promise<boolean> {
+    if (res.status === 401 || res.status === 429) {
+      const body = await res.clone().text().catch(() => "");
+      if (body.includes("OUT_OF_USAGE_CREDITS") || body.includes("quota") || res.status === 429) {
+        log.push(`  ⚠ QUOTA EXCEEDED (HTTP ${res.status}) — need to upgrade plan at the-odds-api.com`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Step 1: live event-level odds
   try {
     const evUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${apiKey}`;
-    log.push(`GET ${evUrl.replace(apiKey, "***")}`);
+    log.push(`GET .../events (key=***)`);
     const evRes = await fetch(evUrl, { cache: "no-store" });
     log.push(`  → HTTP ${evRes.status}`);
 
+    if (await checkQuota(evRes)) return { odds: {}, source: "quota_exceeded", log, quotaExceeded: true };
+
     if (evRes.ok) {
       const events = await evRes.json() as unknown[];
-      log.push(`  → ${events.length} events`);
-
+      log.push(`  → ${events.length} event(s) returned`);
       const now = Date.now();
       const started = (events as Record<string, unknown>[])
         .filter(e => new Date(e.commence_time as string).getTime() <= now)
         .sort((a, b) =>
-          new Date(b.commence_time as string).getTime() -
-          new Date(a.commence_time as string).getTime()
+          new Date(b.commence_time as string).getTime() - new Date(a.commence_time as string).getTime()
         );
-
-      log.push(`  → ${started.length} events already started`);
-
+      log.push(`  → ${started.length} event(s) already started`);
       const candidate = started.find(e => !e.completed) ?? started[0];
       if (candidate) {
         const eventId = candidate.id as string;
-        log.push(`  → Using event: ${candidate.home_team ?? eventId} (completed=${candidate.completed})`);
-
+        log.push(`  → Event ID: ${eventId}`);
         const oUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${eventId}/odds?apiKey=${apiKey}&regions=us&markets=outrights&oddsFormat=american`;
-        log.push(`GET /events/${eventId}/odds`);
+        log.push(`GET .../events/${eventId}/odds`);
         const oRes = await fetch(oUrl, { cache: "no-store" });
         log.push(`  → HTTP ${oRes.status}`);
-
+        if (await checkQuota(oRes)) return { odds: {}, source: "quota_exceeded", log, quotaExceeded: true };
         if (oRes.ok) {
           const oData = await oRes.json() as Record<string, unknown>;
           const bookmakers = (oData.bookmakers as unknown[]) ?? [];
-          log.push(`  → ${bookmakers.length} bookmakers`);
+          log.push(`  → ${bookmakers.length} bookmaker(s)`);
           const odds = extractOdds(bookmakers);
           log.push(`  → ${Object.keys(odds).length} players extracted`);
-          if (Object.keys(odds).length > 0) {
-            return { odds: addNormalized(odds), source: "live_event", log };
-          }
+          if (Object.keys(odds).length > 0) return { odds: addNormalized(odds), source: "live_event", log };
         }
-      } else {
-        log.push("  → No started events found — trying pre-market");
       }
     }
-  } catch (e) {
-    log.push(`  EXCEPTION: ${String(e)}`);
-  }
+  } catch (e) { log.push(`  EXCEPTION: ${String(e)}`); }
 
-  // ── Step 2: try standard outrights / market endpoints ─────────────────────
+  // Step 2: standard market endpoints
   for (const market of MARKETS) {
     try {
       const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=us&markets=${market}&oddsFormat=american`;
       log.push(`GET /odds?markets=${market}`);
       const res = await fetch(url, { cache: "no-store" });
       log.push(`  → HTTP ${res.status}`);
-
-      if (res.status === 422 || res.status === 404) continue;
-      if (!res.ok) { log.push(`  → body: ${await res.text().catch(() => "")}`); continue; }
-
+      if (await checkQuota(res)) return { odds: {}, source: "quota_exceeded", log, quotaExceeded: true };
+      if (res.status === 422 || res.status === 404) { log.push("  → not supported, skipping"); continue; }
+      if (!res.ok) { log.push(`  → ${await res.text().catch(() => "")}`); continue; }
       const data = await res.json() as unknown[];
-      log.push(`  → ${Array.isArray(data) ? data.length : "not-array"} events`);
+      log.push(`  → ${Array.isArray(data) ? data.length : "not-array"} event(s)`);
       if (!Array.isArray(data) || !data.length) continue;
-
       const odds: Record<string, string> = {};
       for (const event of data) {
         const e = event as Record<string, unknown>;
         Object.assign(odds, extractOdds((e.bookmakers as unknown[]) ?? []));
       }
       log.push(`  → ${Object.keys(odds).length} players extracted`);
-      if (Object.keys(odds).length > 0) {
-        return { odds: addNormalized(odds), source: `pre_market_${market}`, log };
-      }
-    } catch (e) {
-      log.push(`  EXCEPTION: ${String(e)}`);
-    }
+      if (Object.keys(odds).length > 0) return { odds: addNormalized(odds), source: `pre_market_${market}`, log };
+    } catch (e) { log.push(`  EXCEPTION: ${String(e)}`); }
   }
 
   return { odds: {}, source: "no_results", log };
@@ -161,11 +161,13 @@ export async function GET(request: Request) {
   const { data: cached } = await supabase
     .from("score_cache").select("data, updated_at").eq("tournament", cacheKey).single();
 
-  // Serve fresh non-empty cache (skip when debug or bust)
-  if (cached && !debug && !bust) {
+  const cachedOdds = (cached?.data ?? {}) as Record<string, string>;
+  const cacheHasData = Object.keys(cachedOdds).length > 0;
+
+  // Serve fresh cache (skip when debug or bust)
+  if (cached && !debug && !bust && cacheHasData) {
     const age = Date.now() - new Date(cached.updated_at as string).getTime();
-    const cachedOdds = (cached.data ?? {}) as Record<string, string>;
-    if (age < CACHE_MS && Object.keys(cachedOdds).length > 0) {
+    if (age < CACHE_MS) {
       return NextResponse.json({ odds: cachedOdds, source: "cache", age_minutes: Math.round(age / 60000) });
     }
   }
@@ -173,16 +175,17 @@ export async function GET(request: Request) {
   const apiKey = process.env.ODDS_API_KEY;
   if (!apiKey) {
     return NextResponse.json({
-      odds: (cached?.data ?? {}) as Record<string, string>,
-      source: "no_api_key",
+      odds: cachedOdds,
+      source: cacheHasData ? "stale_cache_no_key" : "no_api_key",
       debugInfo: ["ODDS_API_KEY is not set in Vercel environment variables."],
     });
   }
 
   const sportKey = SPORT_KEYS[tournamentId] ?? tournament.oddsKey;
-  const { odds, source, log } = await fetchAllOdds(apiKey, sportKey);
+  const { odds, source, log, quotaExceeded } = await fetchAllOdds(apiKey, sportKey);
 
   if (Object.keys(odds).length > 0) {
+    // Save to cache only when we have real data
     await supabase.from("score_cache").upsert({
       tournament: cacheKey,
       data: odds,
@@ -193,11 +196,20 @@ export async function GET(request: Request) {
     return NextResponse.json(resp);
   }
 
-  // Nothing returned — serve stale cache but NEVER cache empty
-  const stale = (cached?.data ?? {}) as Record<string, string>;
+  // No fresh odds — return stale cache with explanation
+  if (quotaExceeded && cacheHasData) {
+    const resp: Record<string, unknown> = {
+      odds: cachedOdds,
+      source: "stale_cache_quota_exceeded",
+      count: Object.keys(cachedOdds).length,
+    };
+    if (debug) { resp.debugInfo = log; resp.hint = "Quota exceeded — showing last cached odds. Upgrade at the-odds-api.com to refresh."; }
+    return NextResponse.json(resp);
+  }
+
   const resp: Record<string, unknown> = {
-    odds: stale,
-    source: Object.keys(stale).length > 0 ? "stale_cache" : "empty",
+    odds: cachedOdds,
+    source: quotaExceeded ? "quota_exceeded_no_cache" : (cacheHasData ? "stale_cache" : "empty"),
   };
   if (debug) resp.debugInfo = log;
   return NextResponse.json(resp);

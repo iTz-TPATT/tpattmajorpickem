@@ -148,6 +148,7 @@ async function fetchFromESPN(tournamentId = "masters"): Promise<GolferScore[]> {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tournament = searchParams.get("tournament") ?? "masters";
+  const debug = searchParams.get("debug") === "1";
   const supabase = createServerSupabase();
 
   // Admin manual scores override
@@ -158,19 +159,28 @@ export async function GET(request: Request) {
   if (adminOverrides.useManualScores) {
     const { data: manualScores } = await supabase
       .from("score_cache").select("data").eq("tournament", `manual_scores_${tournament}`).single();
-    return NextResponse.json({
-      scores: manualScores?.data ?? [],
-      source: manualScores?.data ? "manual" : "manual_empty",
-    });
+    const manualData = manualScores?.data as unknown[] | null;
+    // Only use manual scores if they actually contain data
+    if (manualData && Array.isArray(manualData) && manualData.length > 0) {
+      if (debug) return NextResponse.json({ scores: manualData, source: "manual", count: manualData.length });
+      return NextResponse.json({ scores: manualData, source: "manual" });
+    }
+    // Manual mode is on but no scores saved — fall through to ESPN
+    if (debug) console.log("useManualScores=true but manual scores are empty — falling through to ESPN");
   }
 
   // Cache check
   const { data: cached } = await supabase
     .from("score_cache").select("data, updated_at").eq("tournament", `scores_${tournament}`).single();
 
-  if (cached) {
+  if (cached && !debug) {
     const age = Date.now() - new Date(cached.updated_at as string).getTime();
-    if (age < CACHE_MS) return NextResponse.json({ scores: cached.data, source: "cache" });
+    if (age < CACHE_MS) {
+      const cachedData = cached.data as unknown[];
+      if (cachedData?.length > 0) {
+        return NextResponse.json({ scores: cachedData, source: "cache" });
+      }
+    }
   }
 
   const scores = await fetchFromESPN(tournament);
@@ -180,9 +190,15 @@ export async function GET(request: Request) {
       data: scores,
       updated_at: new Date().toISOString(),
     });
+    if (debug) return NextResponse.json({ scores, source: "espn", count: scores.length, sample: scores.slice(0, 2) });
     return NextResponse.json({ scores, source: "espn" });
   }
 
-  if (cached) return NextResponse.json({ scores: cached.data, source: "stale" });
+  // ESPN returned nothing — return stale cache rather than empty
+  if (cached?.data) {
+    if (debug) return NextResponse.json({ scores: cached.data, source: "stale", warning: "ESPN returned 0 players — serving stale cache" });
+    return NextResponse.json({ scores: cached.data, source: "stale" });
+  }
+  if (debug) return NextResponse.json({ scores: [], source: "empty", warning: "ESPN returned 0 players and no cache exists" });
   return NextResponse.json({ scores: [], source: "empty" });
 }
