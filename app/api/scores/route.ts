@@ -164,8 +164,14 @@ export async function GET(request: Request) {
       if (debug) return NextResponse.json({ scores: manualData, source: "manual", count: manualData.length });
       return NextResponse.json({ scores: manualData, source: "manual" });
     }
-    // Manual mode ON but scores are empty — fall through to ESPN
-    console.warn("useManualScores=true but no manual scores found — falling back to ESPN");
+    // ⚠ Manual mode is ON but scores are empty — auto-clear the flag and fall through to ESPN
+    // This prevents a stuck state where no scores show at all
+    await supabase.from("score_cache").upsert({
+      tournament: "admin_overrides",
+      data: { ...adminOverrides, useManualScores: false },
+      updated_at: new Date().toISOString(),
+    });
+    console.warn("useManualScores=true but manual scores empty — auto-cleared flag, falling back to ESPN");
   }
 
   // ── Supabase ESPN cache ───────────────────────────────────────────────────

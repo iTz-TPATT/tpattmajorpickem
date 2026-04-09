@@ -777,15 +777,20 @@ function ChampionBanner({ tournament }: { tournament: Tournament }) {
 
 // ─── My Picks Tab ─────────────────────────────────────────────────────────────
 function MyPicksTab({
-  token, userId, tournament, allPicks, scores, odds, onPicksChanged,
+  token, userId, tournament, allPicks, scores, odds, currentRound, revealAll, onPicksChanged,
 }: {
   token: string; userId: string; tournament: Tournament;
   allPicks: Pick[]; scores: GolferScore[]; odds: Record<string, string>;
+  currentRound: number; revealAll: boolean;
   onPicksChanged: () => void;
 }) {
-  const round = getCurrentRound(tournament);
-  const revealed = isRoundRevealed(tournament, round);
-  const revealDate = new Date(tournament.rounds[round as 1|2|3|4].revealTimeUTC); // eslint-disable-line react-hooks/exhaustive-deps
+  const round = currentRound;
+  // revealed = picks are locked (can't change), but we still SHOW the player list always.
+  // During live tournament with roundOverride set, always allow picking.
+  const roundDeadlinePassed = isRoundRevealed(tournament, round);
+  // Only lock if deadline passed AND admin hasn't given override access
+  const revealed = roundDeadlinePassed && !revealAll;
+  const revealDate = new Date(tournament.rounds[round as 1|2|3|4].revealTimeUTC);
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -910,8 +915,8 @@ function MyPicksTab({
         {error && <div style={{ background: "rgba(192,57,43,0.12)", border: "1px solid rgba(192,57,43,0.3)", borderRadius: 8, padding: "10px 14px", color: "#e07b6f", marginBottom: 12, fontSize: 14 }}>{error}</div>}
         {success && <div style={{ background: "rgba(93,186,126,0.12)", border: "1px solid rgba(93,186,126,0.3)", borderRadius: 8, padding: "10px 14px", color: "var(--score-low)", marginBottom: 12, fontSize: 14 }}>✓ {success}</div>}
 
-        {/* Golfer list */}
-        {!revealed && (
+        {/* Golfer list — always visible; disabled when picks are locked */}
+        {(
           <>
             <div style={{ height: 1, background: "var(--card-border)", margin: "12px 0" }} />
 
@@ -976,20 +981,22 @@ function MyPicksTab({
               ))}
             </div>
 
-            <button
-              onClick={submit}
-              disabled={selected.length !== 3 || submitting}
-              style={{
-                width: "100%", padding: "13px", marginTop: 16,
-                background: "var(--accent)", color: "var(--bg)",
-                border: "none", borderRadius: 8, fontSize: 16,
-                fontFamily: "Playfair Display, serif", fontWeight: 600,
-                cursor: selected.length !== 3 ? "not-allowed" : "pointer",
-                opacity: selected.length !== 3 || submitting ? 0.5 : 1,
-              }}
-            >
-              {submitting ? "Saving…" : saved ? "Update Picks" : "Lock In Picks"}
-            </button>
+            {!revealed && (
+              <button
+                onClick={submit}
+                disabled={selected.length !== 3 || submitting}
+                style={{
+                  width: "100%", padding: "13px", marginTop: 16,
+                  background: "var(--accent)", color: "var(--bg)",
+                  border: "none", borderRadius: 8, fontSize: 16,
+                  fontFamily: "Playfair Display, serif", fontWeight: 600,
+                  cursor: selected.length !== 3 ? "not-allowed" : "pointer",
+                  opacity: selected.length !== 3 || submitting ? 0.5 : 1,
+                }}
+              >
+                {submitting ? "Saving…" : saved ? "Update Picks" : "Lock In Picks"}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -2443,7 +2450,7 @@ export default function Page() {
       {/* Content */}
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
         {tab === "picks" && token && userId && (
-          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} onPicksChanged={() => fetchData(token)} />
+          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} revealAll={!!adminOverrides.revealAll} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
           <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} pickStatus={pickStatus} />

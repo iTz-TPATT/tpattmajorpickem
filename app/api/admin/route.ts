@@ -91,6 +91,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   }
 
+  // Nuclear reset: clear score cache AND turn off manual scores flag
+  if (action === "force_live_espn") {
+    // Delete cached ESPN scores so next fetch is fresh
+    await supabase.from("score_cache").delete().eq("tournament", "scores_masters");
+    // Turn off manual scores override
+    const { data: ovRow } = await supabase.from("score_cache").select("data").eq("tournament", "admin_overrides").single();
+    const current = (ovRow?.data ?? {}) as Record<string, unknown>;
+    await supabase.from("score_cache").upsert({
+      tournament: "admin_overrides",
+      data: { ...current, useManualScores: false },
+      updated_at: new Date().toISOString(),
+    });
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "clear_odds_cache") {
     await supabase.from("score_cache")
       .delete()

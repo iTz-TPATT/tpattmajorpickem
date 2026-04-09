@@ -453,7 +453,13 @@ export default function AdminPage() {
           {/* ⚠ Warning banner if useManualScores is ON but scores are blank */}
           {overrides.useManualScores && (
             <div style={{ background: "rgba(240,192,64,0.12)", border: "1px solid rgba(240,192,64,0.4)", borderRadius: 6, padding: "10px 14px", marginBottom: 10, fontSize: 12, color: "#f0c040" }}>
-              ⚠ Manual Scores is ON — ESPN scores are blocked. If the scoreboard is blank, click <strong>↺ Clear All Overrides</strong> below to restore live ESPN scores.
+              ⚠ Manual Scores is ON — ESPN scores are blocked. Players and scores will be blank.
+              <button onClick={async () => {
+                const ok = await call("force_live_espn");
+                if (ok) { setOverrides(prev => ({ ...prev, useManualScores: false })); showMsg("✓ Fixed — ESPN scores now active"); }
+              }} style={{ marginLeft: 12, background: "#3a1a00", border: "1px solid #f0c040", color: "#f0c040", padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
+                ⚡ Fix Now
+              </button>
             </div>
           )}
 
@@ -571,6 +577,12 @@ export default function AdminPage() {
             }} style={S.btn("green")}>🧪 Enable Full Test Mode</button>
             <button onClick={async () => { const ok = await call("clear_overrides"); if (ok) { setOverrides({}); showMsg("All overrides cleared — back to real mode"); }}} style={S.btn("yellow")}>
               ↺ Clear All Overrides
+            </button>
+            <button onClick={async () => {
+              const ok = await call("force_live_espn");
+              if (ok) { setOverrides(prev => ({ ...prev, useManualScores: false })); showMsg("✓ Manual scores OFF + cache cleared — ESPN scores will load now"); }
+            }} style={{ ...S.btn("green"), background: "#1a5c1a", border: "1px solid #3a9c3a", color: "#7dea7d" }}>
+              ⚡ Fix Scores (Clear Manual + Refresh ESPN)
             </button>
             <button onClick={async () => { const ok = await call("clear_score_cache"); if (ok) showMsg("Score cache cleared — ESPN will re-fetch"); }} style={S.btn("green")}>
               🔄 Force ESPN Re-fetch
