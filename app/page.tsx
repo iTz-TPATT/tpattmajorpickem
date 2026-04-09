@@ -957,7 +957,17 @@ function MyPicksTab({
               Pick 3 golfers. Hover/hold for season stats. Grayed = already used or cut.
             </p>
 
-            {sortedGolfers.length === 0 && (
+            {sortedGolfers.length === 0 && scores.length === 0 && (
+              <div style={{ textAlign: "center", padding: "24px 16px", color: "var(--cream-dim)" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>⛳</div>
+                <div style={{ fontSize: 15, marginBottom: 6 }}>Loading player data…</div>
+                <div style={{ fontSize: 12, fontStyle: "italic" }}>
+                  If this persists, go to Admin → ⚡ Fix Scores to clear the cache and reload from ESPN.
+                </div>
+              </div>
+            )}
+
+            {sortedGolfers.length === 0 && scores.length > 0 && searchQuery && (
               <p style={{ color: "var(--cream-dim)", fontSize: 14, textAlign: "center", padding: "16px 0" }}>
                 No players match &ldquo;{searchQuery}&rdquo;
               </p>
@@ -2335,7 +2345,7 @@ export default function Page() {
         safeJson(oddsRes,      { odds: {} }),
         safeJson(playersRes,   { count: 0 }),
         safeJson(usersRes,     { users: [] }),
-        safeJson(overridesRes, { overrides: {} }),
+        safeJson(overridesRes, {}),
         safeJson(pickStatusRes, { status: {} }),
       ]);
 
@@ -2344,7 +2354,7 @@ export default function Page() {
       setOdds(oddsData.odds ?? {});
       setPlayerCount(playersData.count ?? 0);
       setRegisteredUsers(usersData.users ?? []);
-      setAdminOverrides(overridesData.overrides ?? {});
+      setAdminOverrides(overridesData ?? {});
       setPickStatus(pickStatusData.status ?? {});
     } catch (err) {
       if ((err as Error).name !== "AbortError") console.warn("fetchData error:", err);

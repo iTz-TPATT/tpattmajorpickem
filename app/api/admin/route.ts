@@ -70,9 +70,9 @@ export async function POST(request: Request) {
 
   // ── Clear overrides ──
   if (action === "clear_overrides") {
-    await supabase.from("score_cache")
-      .delete()
-      .eq("tournament", "admin_overrides");
+    await supabase.from("score_cache").delete().eq("tournament", "admin_overrides");
+    // Also clear score cache so ESPN re-fetches fresh
+    await supabase.from("score_cache").delete().eq("tournament", "scores_masters");
     return NextResponse.json({ success: true });
   }
 
