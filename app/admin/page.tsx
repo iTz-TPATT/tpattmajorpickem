@@ -3,35 +3,37 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { TOURNAMENTS } from "@/lib/tournaments";
 
+// Full confirmed 2026 Masters field (91 players)
+// Tiger Woods and Phil Mickelson are NOT in the 2026 field
 const ADMIN_GOLFERS = [
-  // ── Tier 1 — Favorites ──
-  "Scottie Scheffler", "Rory McIlroy", "Jon Rahm", "Xander Schauffele",
-  "Ludvig Åberg", "Collin Morikawa", "Viktor Hovland", "Tommy Fleetwood",
-  "Bryson DeChambeau", "Min Woo Lee",
-  // ── Tier 2 — Contenders ──
-  "Hideki Matsuyama", "Akshay Bhatia", "Patrick Reed", "Patrick Cantlay",
-  "Justin Thomas", "Jordan Spieth", "Matt Fitzpatrick", "Tyrrell Hatton",
-  "Robert MacIntyre", "Wyndham Clark", "Cameron Young", "Shane Lowry",
-  "Tony Finau", "Will Zalatoris", "Tom Kim", "Sahith Theegala",
-  "Sungjae Im", "Brooks Koepka", "Max Homa", "Russell Henley",
-  // ── Tier 3 — Dark Horses ──
-  "Adam Scott", "Sepp Straka", "Jason Day", "Corey Conners",
-  "Nicolai Hojgaard", "Rasmus Hojgaard", "Ryan Fox", "Sam Burns",
-  "Brian Harman", "Nick Taylor", "Harris English", "Si Woo Kim",
-  "Keegan Bradley", "J.J. Spaun", "Kurt Kitayama", "Davis Riley",
-  "Talor Gooch", "Tom Hoge", "Alex Noren", "Ben Griffin",
-  // ── LIV Players ──
-  "Cameron Smith", "Dustin Johnson", "Bubba Watson", "Phil Mickelson",
-  "Sergio Garcia", "Tyrrell Hatton", "Brooks Koepka", "Abraham Ancer",
-  "Haotong Li", "Carlos Ortiz", "Louis Oosthuizen", "Marc Leishman",
-  // ── Veterans / Past Champions ──
-  "Tiger Woods", "Fred Couples", "Vijay Singh", "Mike Weir",
-  "Zach Johnson", "Larry Mize", "Angel Cabrera", "Nick Faldo",
-  "Jose Maria Olazabal", "Danny Willett", "Charl Schwartzel",
-  // ── Rising Stars / First Timers ──
-  "Chris Gotterup", "Jacob Bridgeman", "Max Greyserman", "Sam Stevens",
-  "Casey Jarvis", "Wyndham Clark",
-].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+  "Scottie Scheffler", "Rory McIlroy", "Ludvig Åberg", "Cameron Young",
+  "Matt Fitzpatrick", "Xander Schauffele", "Bryson DeChambeau", "Jon Rahm",
+  "Tommy Fleetwood", "Collin Morikawa", "Viktor Hovland", "Shane Lowry",
+  "Chris Gotterup", "Nicolai Højgaard", "Jordan Spieth", "Adam Scott",
+  "Patrick Cantlay", "J.J. Spaun", "Dustin Johnson", "Brooks Koepka",
+  "Hideki Matsuyama", "Tom Kim", "Robert MacIntyre", "Joaquin Niemann",
+  "Min Woo Lee", "Justin Thomas", "Patrick Reed", "Sepp Straka",
+  "Corey Conners", "Tony Finau", "Russell Henley", "Sahith Theegala",
+  "Cameron Smith", "Tyrrell Hatton", "Jason Day", "Max Homa",
+  "Sungjae Im", "Harris English", "Alex Noren", "Sam Burns",
+  "Brian Harman", "Wyndham Clark", "Kurt Kitayama", "Nick Taylor",
+  "Ryan Fox", "Ben Griffin", "Carlos Ortiz", "Haotong Li",
+  "Sam Stevens", "Casey Jarvis", "Johnny Keefer", "Max Greyserman",
+  "Michael Brennan", "Akshay Bhatia", "Davis Thompson", "Nick Dunlap",
+  "Rasmus Højgaard", "Matthieu Pavon", "Thomas Detry", "Jacob Bridgeman",
+  "Keegan Bradley", "Billy Horschel", "Christiaan Bezuidenhout",
+  "Chris Kirk", "Keith Mitchell",
+  // Late qualifiers
+  "Gary Woodland", "Daniel Berger", "Jake Knapp", "Matt McCarty",
+  // Past champions (competing)
+  "Bubba Watson", "Sergio Garcia", "Fred Couples", "Mike Weir",
+  "Vijay Singh", "Trevor Immelman", "Charl Schwartzel", "Danny Willett",
+  "Francesco Molinari", "Bernhard Langer", "Sandy Lyle", "Larry Mize",
+  "José María Olazábal", "Mark O'Meara", "Zach Johnson",
+  // Amateurs
+  "Jackson Herrington", "Aldrich Potgieter", "Neal Shipley",
+  "Luke Potter", "Chase Johnson", "Connor Graham",
+].filter((v, i, a) => a.indexOf(v) === i);
 
 interface GolferScore {
   name: string; espnId: string; headshot: null;
@@ -181,10 +183,25 @@ export default function AdminPage() {
       // Fetch user list for proxy picks
       const usersRes = await fetch("/api/admin", { method: "PUT", headers: { "x-admin-password": password } });
       if (usersRes.ok) { const ud = await usersRes.json(); setUsers(ud.users ?? []); }
-      // Build scores list — merge existing cache with full golfer list
-      const existing: GolferScore[] = data.scores ?? [];
-      const existingMap = Object.fromEntries(existing.map((s) => [s.name, s]));
-      const fullList: GolferScore[] = ADMIN_GOLFERS.map((name) => existingMap[name] ?? {
+      // Fetch live scores from ESPN — always use /api/scores for admin so we get the real field
+      let liveScores: GolferScore[] = [];
+      try {
+        const scoresRes = await fetch("/api/scores?tournament=masters");
+        if (scoresRes.ok) {
+          const sd = await scoresRes.json();
+          liveScores = sd.scores ?? [];
+        }
+      } catch { /* ignore */ }
+      // Merge: start with complete static field, overlay any live ESPN scores
+      const liveMap = Object.fromEntries(liveScores.map((s: GolferScore) => [s.name, s]));
+      const staticMap = Object.fromEntries(ADMIN_GOLFERS.map(name => [name, {
+        name, espnId: "", headshot: null,
+        totalScore: 0, position: "", status: "active",
+        r1: null, r2: null, r3: null, r4: null,
+      }]));
+      // Union: all static players + any extra from ESPN (handles players not in static list)
+      const allNames = Array.from(new Set([...ADMIN_GOLFERS, ...liveScores.map((s: GolferScore) => s.name)]));
+      const fullList: GolferScore[] = allNames.map(name => liveMap[name] ?? staticMap[name] ?? {
         name, espnId: "", headshot: null,
         totalScore: 0, position: "", status: "active",
         r1: null, r2: null, r3: null, r4: null,
