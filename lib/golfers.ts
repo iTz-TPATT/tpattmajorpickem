@@ -1,10 +1,10 @@
-// Full 2026 Masters Tournament field — 91 players
-// Source: Golf Channel / NBC Sports confirmed field list
-// Used as guaranteed fallback when ESPN is unavailable so picks page is never blank
+// Full confirmed 2026 Masters Tournament field
+// Source: Augusta National official field + Golf.com + Sky Sports (April 2026)
+// Note: Tiger Woods and Phil Mickelson are NOT in the 2026 field
 
 export function staticPlayersAsScores() {
   const field = [
-    // Tour winners / top ranked
+    // Top contenders
     "Scottie Scheffler",
     "Rory McIlroy",
     "Ludvig Åberg",
@@ -70,34 +70,34 @@ export function staticPlayersAsScores() {
     "Christiaan Bezuidenhout",
     "Chris Kirk",
     "Keith Mitchell",
-    // Past champions (honorary invites)
-    "Phil Mickelson",
+    // Late qualifiers (Houston Open + OWGR top 50)
+    "Gary Woodland",
+    "Daniel Berger",
+    "Jake Knapp",
+    "Matt McCarty",
+    // Past champions (competing)
+    "Bubba Watson",
     "Sergio Garcia",
     "Fred Couples",
-    "Tiger Woods",
-    "Bubba Watson",
     "Mike Weir",
-    "Larry Mize",
-    "José María Olazábal",
-    "Sandy Lyle",
-    "Mark O'Meara",
     "Vijay Singh",
     "Trevor Immelman",
     "Charl Schwartzel",
     "Danny Willett",
     "Francesco Molinari",
     "Bernhard Langer",
+    "Sandy Lyle",
+    "Larry Mize",
+    "José María Olazábal",
+    "Mark O'Meara",
+    "Zach Johnson",
     // Amateurs
     "Jackson Herrington",
-    "Chase Johnson",
-    "Luke Potter",
-    "Connor Graham",
     "Aldrich Potgieter",
-    "Julien Sale",
-    // Additional tour qualifiers
-    "Taylor Moore",
-    "Denny McCarthy",
-    "Eric Cole",
+    "Neal Shipley",
+    "Luke Potter",
+    "Chase Johnson",
+    "Connor Graham",
   ];
 
   return field.map(name => ({
