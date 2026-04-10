@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { staticPlayersAsScores } from "@/lib/golfers";
 
-const CACHE_MS = 2 * 60 * 1000;
+const CACHE_MS = 90 * 1000; // 90 seconds
 
 export interface GolferScore {
   name: string; espnId: string; headshot: string | null;
@@ -11,134 +11,132 @@ export interface GolferScore {
   teeTime: string | null; thru: string | null;
 }
 
-const PAR: Record<string, number> = {
-  masters: 72, pga: 70, usopen: 70, theopen: 71,
-};
+const PAR = 72; // Masters par
 
-function toParFromString(val: string | undefined | null, par: number): number | null {
-  if (!val || val === "--" || val.trim() === "") return null;
-  const s = val.trim();
+/**
+ * Convert an ESPN score string to to-par integer.
+ * ESPN linescores[n].value = raw strokes ("68") or to-par ("-4","E","+2").
+ * Raw strokes are always > 50. To-par values are in range [-20, +30].
+ */
+function toPar(val: unknown): number | null {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s || s === "--") return null;
   if (s === "E") return 0;
   const n = parseInt(s, 10);
   if (isNaN(n)) return null;
-  return n > 50 ? n - par : n;
+  // Raw strokes (e.g. 68) → convert to to-par. To-par values never exceed 50.
+  return n > 50 ? n - PAR : n;
 }
 
-function parseESPN(data: unknown, tournamentId = "masters"): GolferScore[] {
-  const par = PAR[tournamentId] ?? 72;
+/**
+ * Convert ESPN's cumulative score string to to-par.
+ * comp.score is typically already to-par ("-8","E","+2") but can be raw strokes.
+ * We check the individual round scores to determine which.
+ */
+function toParTotal(rawScore: unknown, roundScores: (number|null)[]): number {
+  if (rawScore === "E" || rawScore === 0) return 0;
+  const s = String(rawScore ?? "").trim();
+  if (!s || s === "--") {
+    // Derive from rounds
+    return roundScores.reduce((sum: number, r) => sum + (r ?? 0), 0);
+  }
+  const n = parseInt(s, 10);
+  if (isNaN(n)) return 0;
+  const played = roundScores.filter(r => r !== null).length;
+  // If n > 50 it's raw total strokes — subtract par for each round played
+  return n > 50 && played > 0 ? n - PAR * played : n;
+}
+
+function parseESPN(data: unknown): GolferScore[] {
   const players: GolferScore[] = [];
   try {
     const d = data as Record<string, unknown>;
-    const event = ((d.events as unknown[])?.[0]) as Record<string, unknown> | undefined;
-    if (!event) return players;
+    const events = (d.events as unknown[]) ?? [];
+    if (!events.length) return players;
+    const event = events[0] as Record<string, unknown>;
     const comps = ((event.competitions as unknown[])?.[0] as Record<string, unknown>)?.competitors as unknown[];
     if (!comps?.length) return players;
 
     for (const raw of comps) {
       const comp = raw as Record<string, unknown>;
       const athlete = (comp.athlete as Record<string, unknown>) ?? {};
+      const linescores = (comp.linescores as unknown[]) ?? [];
       const statusObj = (comp.status as Record<string, unknown>) ?? {};
       const statusType = ((statusObj.type as Record<string, unknown>)?.name as string ?? "active").toLowerCase();
-      const linescores = (comp.linescores as Record<string, unknown>[]) ?? [];
 
-      const rounds: Record<number, number | null> = { 1: null, 2: null, 3: null, 4: null };
+      // Parse individual round scores — try displayValue first (to-par string), fall back to value (raw strokes)
+      const rounds: (number | null)[] = [null, null, null, null];
       linescores.forEach((ls, i) => {
         if (i >= 4) return;
-        rounds[i + 1] =
-          toParFromString(ls.displayValue as string, par) ??
-          toParFromString(ls.value as string, par) ?? null;
+        const l = ls as Record<string, unknown>;
+        rounds[i] = toPar(l.displayValue) ?? toPar(l.value);
       });
 
-      const rawScore = (comp.score as string ?? "").trim();
-      let totalScore = 0;
-      if (rawScore === "" || rawScore === "--") {
-        totalScore = (Object.values(rounds).filter(r => r !== null) as number[]).reduce((s, r) => s + r, 0);
-      } else if (rawScore === "E") {
-        totalScore = 0;
-      } else {
-        const n = parseInt(rawScore, 10);
-        if (!isNaN(n)) {
-          totalScore = n > 50
-            ? n - par * Math.max(1, Object.values(rounds).filter(r => r !== null).length)
-            : n;
-        }
-      }
+      const totalScore = toParTotal(comp.score, rounds);
+      const headshotObj = athlete.headshot as Record<string, unknown> | undefined;
 
       let teeTime: string | null = null;
-      const startDate = comp.startDate as string | undefined;
-      if (startDate) {
+      if (comp.startDate) {
         try {
-          teeTime = new Date(startDate).toLocaleTimeString("en-US", {
+          teeTime = new Date(comp.startDate as string).toLocaleTimeString("en-US", {
             timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: true,
           });
         } catch { /* ignore */ }
       }
       if (!teeTime && comp.teeTime) teeTime = String(comp.teeTime);
 
-      const thru = statusObj.thru as string | number | undefined;
+      const thru = statusObj.thru;
       const name = (athlete.displayName as string) ?? "";
       if (!name) continue;
 
       players.push({
         name,
         espnId: String(athlete.id ?? ""),
-        headshot: (athlete.headshot as Record<string, unknown>)?.href as string ?? null,
+        headshot: headshotObj?.href as string ?? null,
         totalScore,
         position: (statusObj.position as Record<string, unknown>)?.displayName as string
           ?? statusObj.displayValue as string ?? "",
         status: statusType.includes("cut") ? "cut" : statusType.includes("wd") ? "wd" : "active",
-        r1: rounds[1], r2: rounds[2], r3: rounds[3], r4: rounds[4],
+        r1: rounds[0], r2: rounds[1], r3: rounds[2], r4: rounds[3],
         teeTime,
         thru: thru != null ? String(thru) : null,
       });
     }
-  } catch (e) { console.error("ESPN parse error:", e); }
+  } catch (e) {
+    console.error("ESPN parse error:", e);
+  }
   return players;
 }
 
-// Try multiple ESPN endpoints with different headers to maximize success rate
-async function fetchESPN(url: string, headers: Record<string, string>): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000); // 6s max per attempt
-  try {
-    return await fetch(url, { headers, cache: "no-store", signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function fetchFromESPN(tournamentId = "masters"): Promise<{ scores: GolferScore[]; log: string[] }> {
-  const log: string[] = [];
-  // Primary: current PGA event (fastest — no event ID lookup needed)
-  // Fallback: specific Masters 2026 event ID
-  const attempts: { url: string; headers: Record<string, string> }[] = [
-    {
-      url: "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
-      headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
-    },
-    {
-      url: "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
-      headers: { "User-Agent": "Mozilla/5.0" },
-    },
+async function fetchFromESPN(): Promise<GolferScore[]> {
+  // Try specific Masters 2026 event ID first (returns full 91-player field)
+  // Fall back to generic PGA endpoint
+  const urls = [
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
   ];
-
-  for (const attempt of attempts) {
+  for (const url of urls) {
     try {
-      const start = Date.now();
-      log.push(`GET ${attempt.url.slice(0, 80)}`);
-      const res = await fetchESPN(attempt.url, attempt.headers);
-      log.push(`  → HTTP ${res.status} (${Date.now() - start}ms)`);
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: ctrl.signal,
+        next: { revalidate: 0 },
+      });
+      clearTimeout(t);
       if (!res.ok) continue;
-      const json = await res.json();
-      const parsed = parseESPN(json, tournamentId);
-      log.push(`  → ${parsed.length} players parsed`);
-      if (parsed.length > 0) return { scores: parsed, log };
+      const parsed = parseESPN(await res.json());
+      console.log(`ESPN ${url.slice(-30)}: ${parsed.length} players`);
+      if (parsed.length > 0) return parsed;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      log.push(`  → ${msg.includes("abort") ? "TIMED OUT (6s)" : `ERROR: ${msg.slice(0, 80)}`}`);
+      console.warn(`ESPN fetch failed (${url.slice(-30)}):`, e instanceof Error ? e.message : e);
+      continue;
     }
   }
-  return { scores: [], log };
+  return [];
 }
 
 export async function GET(request: Request) {
@@ -147,7 +145,7 @@ export async function GET(request: Request) {
   const debug = searchParams.get("debug") === "1";
   const supabase = createServerSupabase();
 
-  // Admin override check
+  // Admin manual scores override
   const { data: adminCache } = await supabase
     .from("score_cache").select("data").eq("tournament", "admin_overrides").single();
   const adminOverrides = (adminCache?.data ?? {}) as Record<string, unknown>;
@@ -155,53 +153,49 @@ export async function GET(request: Request) {
   if (adminOverrides.useManualScores) {
     const { data: manualRow } = await supabase
       .from("score_cache").select("data").eq("tournament", `manual_scores_${tournament}`).single();
-    const manualData = manualRow?.data;
-    if (Array.isArray(manualData) && manualData.length > 0) {
-      return NextResponse.json({ scores: manualData, source: "manual", count: manualData.length });
-    }
+    const md = manualRow?.data as GolferScore[] | undefined;
+    if (md?.length) return NextResponse.json({ scores: md, source: "manual" });
     // Auto-clear stuck flag
     await supabase.from("score_cache").upsert({
       tournament: "admin_overrides",
       data: { ...adminOverrides, useManualScores: false },
       updated_at: new Date().toISOString(),
     });
-    console.warn("useManualScores ON but empty — auto-cleared, falling back to ESPN");
   }
 
-  // Check cache
+  // Serve cached scores if fresh
   const { data: cached } = await supabase
     .from("score_cache").select("data, updated_at").eq("tournament", `scores_${tournament}`).single();
-  const cachedScores = Array.isArray(cached?.data) && (cached!.data as GolferScore[]).length > 0
-    ? cached!.data as GolferScore[] : null;
+  const cachedScores = Array.isArray(cached?.data) ? cached!.data as GolferScore[] : [];
 
-  if (cachedScores && !debug) {
-    const age = Date.now() - new Date((cached!.updated_at as string)).getTime();
+  if (!debug && cachedScores.length > 0) {
+    const age = Date.now() - new Date(cached!.updated_at as string).getTime();
     if (age < CACHE_MS) {
-      return NextResponse.json({ scores: cachedScores, source: "cache", count: cachedScores.length });
+      return NextResponse.json({ scores: cachedScores, source: "cache", age_s: Math.round(age / 1000) });
     }
   }
 
-  // Fetch from ESPN
-  const { scores, log } = await fetchFromESPN(tournament);
+  // Live fetch
+  const live = await fetchFromESPN();
 
-  if (scores.length > 0) {
+  if (live.length > 0) {
     await supabase.from("score_cache").upsert({
       tournament: `scores_${tournament}`,
-      data: scores,
+      data: live,
       updated_at: new Date().toISOString(),
     });
-    if (debug) return NextResponse.json({ scores, source: "espn", count: scores.length, log, sample: scores.slice(0, 3) });
-    return NextResponse.json({ scores, source: "espn", count: scores.length });
+    if (debug) return NextResponse.json({ scores: live, source: "espn", count: live.length, sample: live.slice(0, 3) });
+    return NextResponse.json({ scores: live, source: "espn", count: live.length });
   }
 
-  // ESPN failed — try stale cache
-  if (cachedScores) {
-    if (debug) return NextResponse.json({ scores: cachedScores, source: "stale_cache", count: cachedScores.length, espnLog: log });
+  // Stale cache
+  if (cachedScores.length > 0) {
+    if (debug) return NextResponse.json({ scores: cachedScores, source: "stale_cache", count: cachedScores.length });
     return NextResponse.json({ scores: cachedScores, source: "stale_cache" });
   }
 
-  // Last resort: static field so picks page is never blank
+  // Static fallback — never show blank page
   const staticScores = staticPlayersAsScores();
-  if (debug) return NextResponse.json({ scores: staticScores, source: "static_fallback", count: staticScores.length, espnLog: log, warning: "ESPN unreachable — showing static field, no live scores" });
+  if (debug) return NextResponse.json({ scores: staticScores, source: "static_fallback", count: staticScores.length });
   return NextResponse.json({ scores: staticScores, source: "static_fallback" });
 }

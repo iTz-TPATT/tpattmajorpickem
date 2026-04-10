@@ -1,0 +1,6 @@
+{
+  "functions": {
+    "app/api/scores/route.ts": { "maxDuration": 30 },
+    "app/api/debug-espn/route.ts": { "maxDuration": 30 }
+  }
+}

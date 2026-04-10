@@ -1,73 +1,38 @@
 import { NextResponse } from "next/server";
 
-// Hit /api/debug-espn to see exactly what ESPN returns for the first 3 players
-// This helps diagnose why scoring isn't working
 export async function GET() {
-  const urls = [
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
-  ];
-
-  const results = [];
-
-  for (const url of urls) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    try {
-      const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      if (!res.ok) {
-        results.push({ url, status: res.status, error: "HTTP error" });
-        continue;
-      }
-
-      const d = await res.json() as Record<string, unknown>;
-      const events = (d.events as unknown[]) ?? [];
-      if (!events.length) {
-        results.push({ url, status: res.status, error: "no events in response" });
-        continue;
-      }
-
-      const event = events[0] as Record<string, unknown>;
-      const eventName = event.name ?? event.shortName;
-      const comps = ((event.competitions as unknown[])?.[0] as Record<string, unknown>)?.competitors as unknown[];
-
-      if (!comps?.length) {
-        results.push({ url, status: res.status, eventName, error: "no competitors" });
-        continue;
-      }
-
-      const players = (comps as Record<string, unknown>[]).slice(0, 3).map(comp => {
-        const athlete = (comp.athlete as Record<string, unknown>) ?? {};
-        const linescores = (comp.linescores as Record<string, unknown>[]) ?? [];
-        const status = (comp.status as Record<string, unknown>) ?? {};
-        return {
-          name: athlete.displayName,
-          "comp.score": comp.score,
-          "has_headshot": !!(athlete.headshot),
-          linescores: linescores.slice(0, 2).map((ls, i) => ({
-            round: i + 1,
-            value: ls.value,
-            displayValue: ls.displayValue,
-          })),
-          "status.displayValue": status.displayValue,
-          "status.thru": status.thru,
-        };
-      });
-
-      results.push({ url, status: res.status, eventName, playerCount: comps.length, sample: players });
-      break; // got data, stop trying
-    } catch (e) {
-      clearTimeout(timer);
-      const msg = e instanceof Error ? e.message : String(e);
-      results.push({ url, error: msg.includes("abort") ? "TIMED OUT after 6s" : msg });
-    }
+  const url = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { "User-Agent": "Mozilla/5.0" },
+      next: { revalidate: 0 },
+    });
+    clearTimeout(t);
+    if (!res.ok) return NextResponse.json({ error: `HTTP ${res.status}`, url });
+    const d = await res.json() as Record<string, unknown>;
+    const comps = (((d.events as unknown[])?.[0] as Record<string, unknown>)
+      ?.competitions as unknown[])?.[0] as Record<string, unknown>;
+    const competitors = (comps?.competitors as unknown[]) ?? [];
+    const sample = competitors.slice(0, 3).map((raw) => {
+      const c = raw as Record<string, unknown>;
+      const a = (c.athlete as Record<string, unknown>) ?? {};
+      const s = (c.status as Record<string, unknown>) ?? {};
+      const ls = (c.linescores as Record<string, unknown>[]) ?? [];
+      return {
+        name: a.displayName,
+        score: c.score,
+        headshot: !!(a.headshot),
+        thru: s.thru,
+        linescores: ls.slice(0, 2).map(l => ({ value: l.value, displayValue: l.displayValue })),
+      };
+    });
+    return NextResponse.json({ url, playerCount: competitors.length, sample, ok: true });
+  } catch (e) {
+    clearTimeout(t);
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg.includes("abort") ? "TIMED OUT (8s)" : msg, url });
   }
-
-  return NextResponse.json({ results, timestamp: new Date().toISOString() });
 }
