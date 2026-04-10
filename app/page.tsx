@@ -785,14 +785,12 @@ function MyPicksTab({
   onPicksChanged: () => void;
 }) {
   const round = currentRound;
-  // displayRound: which round's picks form to show.
-  // If admin set roundOverride, always show that round (don't auto-advance).
-  // Otherwise, if current round is locked and skipDeadline is off, show next round.
+  // Always auto-advance to next round when current round is locked (tee times started)
+  // and admin hasn't explicitly unlocked it via skipDeadline.
+  // e.g. during R2 (locked) → show R3 picks form automatically.
+  // When admin sets roundOverride + skipDeadline, that combo keeps the current round open.
   const currentRevealed = isRoundRevealed(tournament, round);
-  const hasOverride = currentRound !== getCurrentRound(tournament); // admin set a specific round
-  const displayRound = hasOverride
-    ? round  // admin explicitly chose this round — show it
-    : (currentRevealed && !skipDeadline && round < 4 ? round + 1 : round);
+  const displayRound = (currentRevealed && !skipDeadline && round < 4) ? round + 1 : round;
   const roundDeadlinePassed = isRoundRevealed(tournament, displayRound);
   // skipDeadline (from admin) forces the form open regardless of clock time
   const revealed = roundDeadlinePassed && !revealAll && !skipDeadline;
@@ -1465,13 +1463,20 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
     return <span style={{ color: s < 0 ? "#c0392b" : "#888", fontWeight: 700 }}>{s > 0 ? `+${s}` : s}</span>;
   }
 
-  // Players who have started (have at least r1 score) sorted by to-par total ascending
-  // Players who haven't teed off yet go to the bottom
-  const started = [...scores]
-    .filter(p => p.status === "active" && p.r1 !== null)
-    .sort((a, b) => a.totalScore - b.totalScore);
-  const notStarted = scores.filter(p => p.status === "active" && p.r1 === null);
-  const active = [...started, ...notStarted];
+  // Parse ESPN position string to a sortable number: "1" → 1, "T3" → 3, "CUT" → 999
+  function positionOrder(p: GolferScore): number {
+    if (p.status !== "active") return 9999;
+    if (p.r1 === null) return 998; // hasn't teed off
+    const pos = p.position ?? "";
+    const n = parseInt(pos.replace(/[^0-9]/g, ""), 10);
+    if (!isNaN(n)) return n;
+    // Fall back to totalScore (lower = better)
+    return 500 + p.totalScore;
+  }
+
+  const active = [...scores]
+    .filter(p => p.status === "active")
+    .sort((a, b) => positionOrder(a) - positionOrder(b) || a.totalScore - b.totalScore);
   const cut = scores.filter(p => p.status !== "active");
 
   if (!scores.length) {

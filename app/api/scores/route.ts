@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { staticPlayersAsScores } from "@/lib/golfers";
 
-const CACHE_MS = 90 * 1000; // 90 seconds
+const CACHE_MS = 60 * 1000; // 60 seconds — refresh frequently during live play
 
 export interface GolferScore {
   name: string; espnId: string; headshot: string | null;
