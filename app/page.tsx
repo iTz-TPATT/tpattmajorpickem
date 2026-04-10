@@ -777,20 +777,25 @@ function ChampionBanner({ tournament }: { tournament: Tournament }) {
 
 // ─── My Picks Tab ─────────────────────────────────────────────────────────────
 function MyPicksTab({
-  token, userId, tournament, allPicks, scores, odds, currentRound, revealAll, onPicksChanged,
+  token, userId, tournament, allPicks, scores, odds, currentRound, revealAll, skipDeadline, onPicksChanged,
 }: {
   token: string; userId: string; tournament: Tournament;
   allPicks: Pick[]; scores: GolferScore[]; odds: Record<string, string>;
-  currentRound: number; revealAll: boolean;
+  currentRound: number; revealAll: boolean; skipDeadline: boolean;
   onPicksChanged: () => void;
 }) {
   const round = currentRound;
-  // If current round is locked, show the NEXT round so users can submit ahead.
-  // e.g. during R1 (locked after 7am tee time), auto-show R2 picks form.
+  // displayRound: which round's picks form to show.
+  // If admin set roundOverride, always show that round (don't auto-advance).
+  // Otherwise, if current round is locked and skipDeadline is off, show next round.
   const currentRevealed = isRoundRevealed(tournament, round);
-  const displayRound = currentRevealed && round < 4 ? round + 1 : round;
+  const hasOverride = currentRound !== getCurrentRound(tournament); // admin set a specific round
+  const displayRound = hasOverride
+    ? round  // admin explicitly chose this round — show it
+    : (currentRevealed && !skipDeadline && round < 4 ? round + 1 : round);
   const roundDeadlinePassed = isRoundRevealed(tournament, displayRound);
-  const revealed = roundDeadlinePassed && !revealAll;
+  // skipDeadline (from admin) forces the form open regardless of clock time
+  const revealed = roundDeadlinePassed && !revealAll && !skipDeadline;
   const revealDate = new Date(tournament.rounds[displayRound as 1|2|3|4].revealTimeUTC);
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
   const [selected, setSelected] = useState<string[]>([]);
@@ -1460,7 +1465,13 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
     return <span style={{ color: s < 0 ? "#c0392b" : "#888", fontWeight: 700 }}>{s > 0 ? `+${s}` : s}</span>;
   }
 
-  const active = [...scores].filter(p => p.status === "active").sort((a, b) => a.totalScore - b.totalScore);
+  // Players who have started (have at least r1 score) sorted by to-par total ascending
+  // Players who haven't teed off yet go to the bottom
+  const started = [...scores]
+    .filter(p => p.status === "active" && p.r1 !== null)
+    .sort((a, b) => a.totalScore - b.totalScore);
+  const notStarted = scores.filter(p => p.status === "active" && p.r1 === null);
+  const active = [...started, ...notStarted];
   const cut = scores.filter(p => p.status !== "active");
 
   if (!scores.length) {
@@ -2254,7 +2265,7 @@ export default function Page() {
   const [scores, setScores] = useState<GolferScore[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<{id: string; username: string}[]>([]);
   const [roundOverride, setRoundOverride] = useState<number | null>(null);
-  const [adminOverrides, setAdminOverrides] = useState<{roundOverride?: number; revealAll?: boolean}>({});
+  const [adminOverrides, setAdminOverrides] = useState<{roundOverride?: number; revealAll?: boolean; skipDeadline?: boolean}>({});
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const [pickStatus, setPickStatus] = useState<Record<string, number[]>>({});
@@ -2461,7 +2472,7 @@ export default function Page() {
       {/* Content */}
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
         {tab === "picks" && token && userId && (
-          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} revealAll={!!adminOverrides.revealAll} onPicksChanged={() => fetchData(token)} />
+          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
           <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} pickStatus={pickStatus} />
