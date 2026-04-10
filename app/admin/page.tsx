@@ -143,6 +143,7 @@ export default function AdminPage() {
   const [proxyRound, setProxyRound] = useState(1);
   const [proxyPicks, setProxyPicks] = useState<string[]>([]);
   const [proxyMsg, setProxyMsg] = useState("");
+  const [proxySearch, setProxySearch] = useState("");
   const [oddsDebug, setOddsDebug] = useState<string>("");
   const [statsDebug, setStatsDebug] = useState<string>("");
   const [photoDebug, setPhotoDebug] = useState<string>("");
@@ -714,6 +715,14 @@ export default function AdminPage() {
             Select 3 Golfers ({proxyPicks.length}/3)
           </div>
 
+          <input
+            type="text"
+            placeholder="Search player…"
+            value={proxySearch}
+            onChange={e => setProxySearch(e.target.value)}
+            style={{ width: "100%", padding: "8px 12px", marginBottom: 10, background: "#1a1a1a", border: "1px solid #444", borderRadius: 6, color: "#e0e0e0", fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+          />
+
           {proxyPicks.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {proxyPicks.map(g => (
@@ -725,22 +734,30 @@ export default function AdminPage() {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, maxHeight: 300, overflowY: "auto", marginBottom: 14 }}>
-            {ADMIN_GOLFERS.map(g => {
-              const sel = proxyPicks.includes(g);
-              const dis = !sel && proxyPicks.length >= 3;
-              return (
-                <button key={g} onClick={() => toggleProxyPick(g)} disabled={dis}
-                  style={{
-                    padding: "7px 10px", fontSize: 12, border: `1px solid ${sel ? "#3a6a3a" : "#333"}`,
-                    background: sel ? "#1a3a1a" : "#1a1a1a", color: sel ? "#5dba7e" : dis ? "#444" : "#aaa",
-                    borderRadius: 6, cursor: dis ? "not-allowed" : "pointer", textAlign: "left",
-                    transition: "all 0.1s",
-                  }}>
-                  {g}
-                </button>
-              );
-            })}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, maxHeight: 320, overflowY: "auto", marginBottom: 14 }}>
+            {(() => {
+              const liveNames = scores.length > 0
+                ? [...scores].sort((a, b) => a.name.split(" ")[0].localeCompare(b.name.split(" ")[0])).map(s => s.name)
+                : ADMIN_GOLFERS;
+              const filtered = proxySearch.trim()
+                ? liveNames.filter(n => n.toLowerCase().includes(proxySearch.toLowerCase()))
+                : liveNames;
+              return filtered.map(g => {
+                const sel = proxyPicks.includes(g);
+                const dis = !sel && proxyPicks.length >= 3;
+                return (
+                  <button key={g} onClick={() => toggleProxyPick(g)} disabled={dis}
+                    style={{
+                      padding: "7px 10px", fontSize: 12, border: `1px solid ${sel ? "#3a6a3a" : "#333"}`,
+                      background: sel ? "#1a3a1a" : "#1a1a1a", color: sel ? "#5dba7e" : dis ? "#444" : "#aaa",
+                      borderRadius: 6, cursor: dis ? "not-allowed" : "pointer", textAlign: "left",
+                      transition: "all 0.1s",
+                    }}>
+                    {g}
+                  </button>
+                );
+              });
+            })()}
           </div>
 
           <button onClick={submitProxyPicks} disabled={saving || proxyPicks.length !== 3 || !proxyUser}
