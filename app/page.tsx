@@ -1989,68 +1989,65 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 }
 
 // ─── Round Leader Banner ──────────────────────────────────────────────────────
-// ─── Score Ticker ─────────────────────────────────────────────────────────────
-function tickerFmtScore(s: number) {
-  if (s === 0) return "E";
-  return s > 0 ? `+${s}` : `${s}`;
-}
-function tickerScoreColor(s: number) {
-  if (s < 0) return "#c0392b";
-  if (s === 0) return "rgba(255,255,255,0.7)";
-  return "rgba(255,255,255,0.4)";
-}
-function TickerItem({ p, pos }: { p: GolferScore; pos: number }) {
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 6,
-      padding: "0 18px", borderRight: "1px solid rgba(255,255,255,0.08)",
-      flexShrink: 0, whiteSpace: "nowrap",
-    }}>
-      <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace", minWidth: 16 }}>{pos + 1}</span>
-      <span style={{ fontSize: 12, color: "rgba(240,233,214,0.9)", letterSpacing: "0.02em" }}>
-        {p.name.split(" ").slice(-1)[0]}
-        {p.name.split(" ").length > 1 && (
-          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>, {p.name.split(" ")[0][0]}.</span>
-        )}
+// ─── Pool Usage Ticker ────────────────────────────────────────────────────────
+function PoolUsageTicker({ picks, registeredUsers }: { picks: Pick[]; registeredUsers: { id: string; username: string }[] }) {
+  const totalUsers = registeredUsers.length;
+  if (!totalUsers || !picks.length) return null;
+
+  // Count how many distinct users have picked each golfer across all rounds
+  const golferUsers: Record<string, Set<string>> = {};
+  picks.forEach(p => {
+    if (!golferUsers[p.golfer]) golferUsers[p.golfer] = new Set();
+    golferUsers[p.golfer].add(p.user_id);
+  });
+
+  // Build sorted list: most picked first, show name + % of pool
+  const items = Object.entries(golferUsers)
+    .map(([golfer, users]) => ({ golfer, count: users.size, pct: Math.round((users.size / totalUsers) * 100) }))
+    .sort((a, b) => b.count - a.count || a.golfer.localeCompare(b.golfer));
+
+  if (!items.length) return null;
+
+  function PickItem({ item, prefix }: { item: typeof items[0]; prefix: string }) {
+    const lastName = item.golfer.split(" ").slice(-1)[0];
+    const firstInit = item.golfer.split(" ").length > 1 ? item.golfer.split(" ")[0][0] + "." : "";
+    const pctColor = item.pct >= 75 ? "#c9a84c" : item.pct >= 50 ? "#e8dcc8" : "rgba(240,233,214,0.6)";
+    return (
+      <span key={`${prefix}-${item.golfer}`} style={{
+        display: "inline-flex", alignItems: "center", gap: 5,
+        padding: "0 16px", borderRight: "1px solid rgba(255,255,255,0.08)",
+        flexShrink: 0, whiteSpace: "nowrap",
+      }}>
+        <span style={{ fontSize: 12, color: "rgba(240,233,214,0.9)", letterSpacing: "0.02em" }}>
+          {firstInit && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>{firstInit} </span>}
+          {lastName}
+        </span>
+        <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: pctColor }}>
+          {item.pct}%
+        </span>
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>
+          {item.count}/{totalUsers}
+        </span>
       </span>
-      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: tickerScoreColor(p.totalScore) }}>
-        {tickerFmtScore(p.totalScore)}
-      </span>
-      {p.r1 !== null && p.r2 === null && (
-        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>R1</span>
-      )}
-    </span>
-  );
-}
-
-function ScoreTicker({ scores }: { scores: GolferScore[] }) {
-  if (!scores.length) return null;
-
-  const sorted = [...scores]
-    .filter(s => s.status === "active")
-    .sort((a, b) => a.totalScore - b.totalScore)
-    .slice(0, 30);
-
-  if (!sorted.length) return null;
+    );
+  }
 
   return (
     <div className="ticker-wrap" style={{ padding: "5px 0" }}>
       <div style={{ display: "flex", alignItems: "center" }}>
-        {/* Label */}
         <div style={{
           flexShrink: 0, padding: "0 12px", borderRight: "1px solid rgba(201,168,76,0.3)",
           fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
           color: "#c9a84c", background: "#061210", zIndex: 1,
           display: "flex", alignItems: "center", gap: 6,
         }}>
-          <span>⛳</span>
-          <span>LIVE</span>
+          <span>🏌️</span>
+          <span>POOL</span>
         </div>
-        {/* Two independent copies with unique keys for seamless loop */}
         <div style={{ overflow: "hidden", flex: 1 }}>
           <div className="ticker-track">
-            {sorted.map((p, i) => <TickerItem key={`a-${i}`} p={p} pos={i} />)}
-            {sorted.map((p, i) => <TickerItem key={`b-${i}`} p={p} pos={i} />)}
+            {items.map(item => <PickItem key={`a-${item.golfer}`} item={item} prefix="a" />)}
+            {items.map(item => <PickItem key={`b-${item.golfer}`} item={item} prefix="b" />)}
           </div>
         </div>
       </div>
@@ -2471,8 +2468,8 @@ export default function Page() {
         ))}
       </div>
 
-      {/* Score ticker */}
-      <ScoreTicker scores={scores} />
+      {/* Pool usage ticker */}
+      <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} />
 
       {/* Content */}
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
