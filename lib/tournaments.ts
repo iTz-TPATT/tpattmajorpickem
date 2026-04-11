@@ -35,8 +35,8 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
     rounds: {
       1: { date: "2026-04-09", revealTimeUTC: "2026-04-09T12:00:00Z" },
       2: { date: "2026-04-10", revealTimeUTC: "2026-04-10T12:00:00Z" },
-      3: { date: "2026-04-11", revealTimeUTC: "2026-04-11T13:30:00Z" },
-      4: { date: "2026-04-12", revealTimeUTC: "2026-04-12T13:30:00Z" },
+      3: { date: "2026-04-11", revealTimeUTC: "2026-04-11T11:00:00Z" },
+      4: { date: "2026-04-12", revealTimeUTC: "2026-04-12T11:00:00Z" },
     },
     priorChampion: { name: "Wyatt T.O. Robson", year: 2025 },
     theme: {

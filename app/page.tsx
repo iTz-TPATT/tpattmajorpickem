@@ -388,10 +388,11 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
 
 // ─── Golfer Card ──────────────────────────────────────────────────────────────
 function GolferCard({
-  name, score, selected, burned, cut, disabled, odds, espnId, headshot, onClick,
+  name, score, selected, burned, cut, disabled, odds, espnId, headshot, usagePct, onClick,
 }: {
   name: string; score: GolferScore | undefined; selected: boolean; burned: boolean;
   cut: boolean; disabled: boolean; odds: string; espnId: string; headshot: string | null;
+  usagePct: number | null;
   onClick: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
@@ -465,6 +466,14 @@ function GolferCard({
             {cut && <span style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "#e07b6f", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>CUT</span>}
             {odds && !burned && !cut && <span style={{ fontSize: 11, color: "var(--accent-light, var(--accent))", opacity: 0.8 }}>{odds}</span>}
             {score?.position && !burned && !cut && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+            {usagePct !== null && !burned && !cut && (
+              <span style={{
+                fontSize: 10, padding: "1px 5px", borderRadius: 4,
+                background: usagePct >= 75 ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.06)",
+                color: usagePct >= 75 ? "#c9a84c" : usagePct >= 50 ? "var(--cream-dim)" : "rgba(255,255,255,0.3)",
+                fontFamily: "monospace", letterSpacing: "0.02em",
+              }}>{usagePct}%</span>
+            )}
             {score?.teeTime && !burned && !cut && score.r1 === null && (
               <span style={{ fontSize: 10, color: "rgba(201,168,76,0.7)", letterSpacing: "0.04em" }}>⏱ {score.teeTime}</span>
             )}
@@ -806,6 +815,21 @@ function MyPicksTab({
 
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
 
+  // Pool usage % per golfer — only count revealed rounds so future picks stay hidden
+  const revealedRoundsForUsage = [1, 2, 3, 4].filter(r => isRoundRevealed(tournament, r));
+  const totalPoolUsers = new Set(allPicks.map(p => p.user_id)).size;
+  const golferPoolCount: Record<string, Set<string>> = {};
+  allPicks
+    .filter(p => revealedRoundsForUsage.includes(p.round_number))
+    .forEach(p => {
+      if (!golferPoolCount[p.golfer]) golferPoolCount[p.golfer] = new Set();
+      golferPoolCount[p.golfer].add(p.user_id);
+    });
+  const poolUsagePct = (n: string): number | null => {
+    if (!totalPoolUsers || !golferPoolCount[n]) return null;
+    return Math.round((golferPoolCount[n].size / totalPoolUsers) * 100);
+  };
+
   // My picks for the round being displayed
   const myCurrentPicks = allPicks.filter((p) => p.user_id === userId && p.round_number === displayRound).map((p) => p.golfer);
 
@@ -990,6 +1014,7 @@ function MyPicksTab({
                   odds={odds[gs.name] ?? odds[normalizeName(gs.name)] ?? ""}
                   espnId={gs.espnId}
                   headshot={gs.headshot}
+                  usagePct={poolUsagePct(gs.name)}
                   onClick={() => toggle(gs.name)}
                 />
               ))}
@@ -1108,7 +1133,27 @@ function LeaderboardTab({
     }
 
     return { uid, username: uname, total, rounds: roundBreakdowns };
-  }).sort((a, b) => a.total - b.total);
+  }).sort((a, b) => {
+    if (a.total !== b.total) return a.total - b.total;
+    if (a.username === "Trenton Patterson") return -1;
+    if (b.username === "Trenton Patterson") return 1;
+    return a.username.localeCompare(b.username);
+  });
+
+  // Golfer usage % across the pool — only count revealed rounds so future picks stay hidden
+  const revealedRoundsForUsage = [1, 2, 3, 4].filter(r => isRoundRevealed(tournament, r));
+  const totalUsersInPool = Object.keys(userMap).length;
+  const golferPickCount: Record<string, Set<string>> = {};
+  allPicks
+    .filter(p => revealedRoundsForUsage.includes(p.round_number))
+    .forEach(p => {
+      if (!golferPickCount[p.golfer]) golferPickCount[p.golfer] = new Set();
+      golferPickCount[p.golfer].add(p.user_id);
+    });
+  const golferUsagePct = (golfer: string): number | null => {
+    if (!totalUsersInPool || !golferPickCount[golfer]) return null;
+    return Math.round((golferPickCount[golfer].size / totalUsersInPool) * 100);
+  };
 
   if (!standings.length) {
     return (
@@ -1189,8 +1234,10 @@ function LeaderboardTab({
         {standings.map((u, i) => {
           const isOpen = expanded === u.uid;
           const isLeader = i === 0;
-          const isTied = i > 0 && u.total === standings[i - 1].total;
-          const posLabel = isTied ? `T${i + 1}` : `${i + 1}`;
+          // True rank = number of players with a strictly better score + 1
+          const trueRank = standings.filter(s => s.total < u.total).length + 1;
+          const isTied = standings.filter(s => s.total === u.total).length > 1;
+          const posLabel = isTied ? `T${trueRank}` : `${trueRank}`;
 
           return (
             <div key={u.uid} style={{ borderBottom: i < standings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
@@ -2014,19 +2061,16 @@ function PoolUsageTicker({ picks, registeredUsers }: { picks: Pick[]; registered
     const pctColor = item.pct >= 75 ? "#c9a84c" : item.pct >= 50 ? "#e8dcc8" : "rgba(240,233,214,0.6)";
     return (
       <span key={`${prefix}-${item.golfer}`} style={{
-        display: "inline-flex", alignItems: "center", gap: 5,
-        padding: "0 16px", borderRight: "1px solid rgba(255,255,255,0.08)",
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "0 10px", borderRight: "1px solid rgba(255,255,255,0.08)",
         flexShrink: 0, whiteSpace: "nowrap",
       }}>
-        <span style={{ fontSize: 12, color: "rgba(240,233,214,0.9)", letterSpacing: "0.02em" }}>
-          {firstInit && <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>{firstInit} </span>}
+        <span style={{ fontSize: 11, color: "rgba(240,233,214,0.85)" }}>
+          {firstInit && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>{firstInit} </span>}
           {lastName}
         </span>
-        <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: pctColor }}>
+        <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: pctColor }}>
           {item.pct}%
-        </span>
-        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>
-          {item.count}/{totalUsers}
         </span>
       </span>
     );
