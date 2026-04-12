@@ -77,14 +77,18 @@ function parseESPN(data: unknown): GolferScore[] {
       const headshotObj = athlete.headshot as Record<string, unknown> | undefined;
 
       let teeTime: string | null = null;
-      if (comp.startDate) {
+      // statusObj.teeTime is round-specific (most accurate)
+      if (statusObj.teeTime) {
+        teeTime = String(statusObj.teeTime);
+      } else if (comp.teeTime) {
+        teeTime = String(comp.teeTime);
+      } else if (comp.startDate) {
         try {
           teeTime = new Date(comp.startDate as string).toLocaleTimeString("en-US", {
             timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: true,
           });
         } catch { /* ignore */ }
       }
-      if (!teeTime && comp.teeTime) teeTime = String(comp.teeTime);
 
       const thru = statusObj.thru;
       const name = (athlete.displayName as string) ?? "";

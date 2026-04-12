@@ -16,7 +16,7 @@ export async function GET() {
     const comps = (((d.events as unknown[])?.[0] as Record<string, unknown>)
       ?.competitions as unknown[])?.[0] as Record<string, unknown>;
     const competitors = (comps?.competitors as unknown[]) ?? [];
-    const sample = competitors.slice(0, 3).map((raw) => {
+    const sample = competitors.slice(0, 5).map((raw) => {
       const c = raw as Record<string, unknown>;
       const a = (c.athlete as Record<string, unknown>) ?? {};
       const s = (c.status as Record<string, unknown>) ?? {};
@@ -24,9 +24,11 @@ export async function GET() {
       return {
         name: a.displayName,
         score: c.score,
-        headshot: !!(a.headshot),
         thru: s.thru,
-        linescores: ls.slice(0, 2).map(l => ({ value: l.value, displayValue: l.displayValue })),
+        "status.teeTime": s.teeTime,
+        "comp.teeTime": c.teeTime,
+        "comp.startDate": c.startDate,
+        linescores: ls.slice(0, 4).map(l => ({ value: l.value, displayValue: l.displayValue })),
       };
     });
     return NextResponse.json({ url, playerCount: competitors.length, sample, ok: true });
