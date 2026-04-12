@@ -1370,6 +1370,38 @@ function LeaderboardTab({
                         {rd.picks.map((g, pi) => {
                           const rs = roundScores[pi];
                           const notCounted = droppedIdxLb === pi;
+                          const gs = scoreMap[g];
+                          const usagePct = golferUsagePct(g);
+
+                          // Thru info: show hole # or "F" for finished, tee time for not started
+                          let thruLabel: React.ReactNode = null;
+                          if (gs) {
+                            if (gs.thru && gs.thru !== "0") {
+                              const thruText = gs.thru === "F" || gs.thru === "18" ? "F" : `Thru ${gs.thru}`;
+                              thruLabel = (
+                                <span style={{ fontSize: 10, color: gs.thru === "F" || gs.thru === "18" ? "rgba(255,255,255,0.3)" : "#c9a84c", fontFamily: "monospace" }}>
+                                  {thruText}
+                                </span>
+                              );
+                            } else if (gs.r1 === null && gs.teeTime) {
+                              // Convert tee time (already ET) to CT by subtracting 1 hour
+                              let ctTime = gs.teeTime;
+                              try {
+                                const [time, ampm] = gs.teeTime.replace(" ", "").split(/(AM|PM)/i);
+                                const [h, m] = time.split(":").map(Number);
+                                let hour = h - 1;
+                                let period = ampm.toUpperCase();
+                                if (hour <= 0) { hour = 12 + hour; period = period === "AM" ? "PM" : "AM"; }
+                                ctTime = `${hour}:${String(m).padStart(2, "0")} ${period} CT`;
+                              } catch { /* use as-is */ }
+                              thruLabel = (
+                                <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace" }}>
+                                  ⏱ {ctTime}
+                                </span>
+                              );
+                            }
+                          }
+
                           return (
                             <div key={g} style={{
                               display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -1378,8 +1410,19 @@ function LeaderboardTab({
                               borderRadius: 4, marginBottom: 3,
                               opacity: notCounted ? 0.45 : 1,
                             }}>
-                              <span style={{ color: "#e8dcc8", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ color: "#e8dcc8", textDecoration: notCounted ? "line-through" : "none" }}>{g}</span>
+                                {usagePct !== null && revealedRoundsForUsage.includes(rNum) && (
+                                  <span style={{
+                                    fontSize: 10, padding: "1px 5px", borderRadius: 4,
+                                    background: usagePct >= 75 ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.05)",
+                                    color: usagePct >= 75 ? "#c9a84c" : usagePct >= 50 ? "#e8dcc8" : "rgba(255,255,255,0.35)",
+                                    fontFamily: "monospace",
+                                  }}>{usagePct}% pool</span>
+                                )}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                {thruLabel}
                                 {notCounted && <span style={{ fontSize: 10, color: "#888", letterSpacing: "0.06em" }}>NOT COUNTED</span>}
                                 <span style={{ fontFamily: "monospace", fontWeight: 600, color: mastersColor(rs) }}>{mastersScore(rs)}</span>
                               </div>
