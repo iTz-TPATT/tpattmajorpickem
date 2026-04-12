@@ -1373,22 +1373,24 @@ function LeaderboardTab({
                           const gs = scoreMap[g];
                           const usagePct = golferUsagePct(g);
 
-                          // Thru info: show hole # or "F" for finished, tee time for not started
+                          // Thru info: show hole # or "F" for finished, tee time for not yet thru a hole
                           let thruLabel: React.ReactNode = null;
                           if (gs) {
                             const thruVal = gs.thru != null ? String(gs.thru).trim() : null;
-                            const thruNum = thruVal ? parseInt(thruVal, 10) : null;
-                            const hasStarted = gs.r4 !== null || (thruNum !== null && thruNum > 0);
+                            const thruNum = thruVal ? parseInt(thruVal, 10) : 0;
+                            const isDone = thruVal === "F" || thruNum === 18;
+                            const isOnCourse = !isDone && thruNum > 0;
+                            const notStarted = !isDone && thruNum === 0;
 
-                            if (thruVal && thruVal !== "0" && thruNum !== 0) {
-                              const isDone = thruVal === "F" || thruNum === 18;
-                              const thruText = isDone ? "✓ F" : `Thru ${thruVal}`;
+                            if (isDone) {
                               thruLabel = (
-                                <span style={{ fontSize: 10, color: isDone ? "rgba(255,255,255,0.3)" : "#c9a84c", fontFamily: "monospace" }}>
-                                  {thruText}
-                                </span>
+                                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: "monospace" }}>✓ F</span>
                               );
-                            } else if (!hasStarted && gs.teeTime) {
+                            } else if (isOnCourse) {
+                              thruLabel = (
+                                <span style={{ fontSize: 10, color: "#c9a84c", fontFamily: "monospace" }}>Thru {thruNum}</span>
+                              );
+                            } else if (notStarted && gs.teeTime) {
                               // Convert ET → CT (subtract 1 hour)
                               let ctTime = gs.teeTime;
                               try {
@@ -1400,9 +1402,7 @@ function LeaderboardTab({
                                 ctTime = `${hour}:${String(m).padStart(2, "0")} ${period} CT`;
                               } catch { /* use as-is */ }
                               thruLabel = (
-                                <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace" }}>
-                                  ⏱ {ctTime}
-                                </span>
+                                <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "monospace" }}>⏱ {ctTime}</span>
                               );
                             }
                           }
