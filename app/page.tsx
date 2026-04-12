@@ -1376,15 +1376,20 @@ function LeaderboardTab({
                           // Thru info: show hole # or "F" for finished, tee time for not started
                           let thruLabel: React.ReactNode = null;
                           if (gs) {
-                            if (gs.thru && gs.thru !== "0") {
-                              const thruText = gs.thru === "F" || gs.thru === "18" ? "F" : `Thru ${gs.thru}`;
+                            const thruVal = gs.thru != null ? String(gs.thru).trim() : null;
+                            const thruNum = thruVal ? parseInt(thruVal, 10) : null;
+                            const hasStarted = gs.r4 !== null || (thruNum !== null && thruNum > 0);
+
+                            if (thruVal && thruVal !== "0" && thruNum !== 0) {
+                              const isDone = thruVal === "F" || thruNum === 18;
+                              const thruText = isDone ? "✓ F" : `Thru ${thruVal}`;
                               thruLabel = (
-                                <span style={{ fontSize: 10, color: gs.thru === "F" || gs.thru === "18" ? "rgba(255,255,255,0.3)" : "#c9a84c", fontFamily: "monospace" }}>
+                                <span style={{ fontSize: 10, color: isDone ? "rgba(255,255,255,0.3)" : "#c9a84c", fontFamily: "monospace" }}>
                                   {thruText}
                                 </span>
                               );
-                            } else if (gs.r1 === null && gs.teeTime) {
-                              // Convert tee time (already ET) to CT by subtracting 1 hour
+                            } else if (!hasStarted && gs.teeTime) {
+                              // Convert ET → CT (subtract 1 hour)
                               let ctTime = gs.teeTime;
                               try {
                                 const [time, ampm] = gs.teeTime.replace(" ", "").split(/(AM|PM)/i);
