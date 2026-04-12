@@ -1373,9 +1373,10 @@ function LeaderboardTab({
                           const gs = scoreMap[g];
                           const usagePct = golferUsagePct(g);
 
-                          // Thru info: show hole # or "F" for finished, tee time for not yet thru a hole
+                          // Only show thru/tee time for the current active round
+                          const isCurrentRound = rNum === currentRound;
                           let thruLabel: React.ReactNode = null;
-                          if (gs) {
+                          if (gs && isCurrentRound) {
                             const thruVal = gs.thru != null ? String(gs.thru).trim() : null;
                             const thruNum = thruVal ? parseInt(thruVal, 10) : 0;
                             const isDone = thruVal === "F" || thruNum === 18;
