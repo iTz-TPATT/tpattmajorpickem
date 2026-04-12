@@ -2344,6 +2344,94 @@ function BannerContent() {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
+// ─── Toast Notification System ────────────────────────────────────────────────
+type ToastType = "gold" | "green" | "red";
+interface ToastMsg { id: number; type: ToastType; text: string; }
+
+const BOGEY_JOKES = [
+  "is absolutely shitting the bed 💩",
+  "is choking harder than a python 🐍",
+  "is absolutely crumbling 😬",
+  "might be crying right now 😭",
+  "is watching their lead evaporate 😤",
+  "is having a complete meltdown 🤯",
+  "is imploding in spectacular fashion 💥",
+  "is cooked 🍳",
+];
+
+const COMEBACK_LINES = [
+  "is making a move 🚀",
+  "just woke up 👀",
+  "smells blood in the water 🦈",
+  "is not dead yet 😤",
+  "decided to show up today 📈",
+];
+
+const COLLAPSE_LINES = [
+  "is absolutely free-falling 📉",
+  "is having a historic collapse 😱",
+  "is watching it all fall apart 💀",
+  "picked the wrong week to be here 🫠",
+  "is in complete freefall 🪂",
+];
+
+const EAGLE_LINES = [
+  "OH BABY 🦅",
+  "ABSOLUTELY MASSIVE 🦅",
+  "GET IN THE HOLE 🦅",
+  "THE EAGLE HAS LANDED 🦅",
+  "SOMEBODY STOP HIM 🦅",
+];
+
+const BIRDIE_STREAK_LINES = [
+  "is on absolute FIRE 🔥",
+  "cannot be stopped right now 🔥",
+  "is going low 🔥",
+  "is making a statement 🔥",
+  "is in the zone 🔥",
+];
+
+const WINNER_LINES = [
+  "It's OVER.",
+  "Stick a fork in it.",
+  "Everyone else is playing for second.",
+  "Pack it up folks.",
+  "The fat lady is singing.",
+];
+
+function ToastStack({ toasts, onDismiss }: { toasts: ToastMsg[]; onDismiss: (id: number) => void }) {
+  if (!toasts.length) return null;
+  return (
+    <div style={{
+      position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+      zIndex: 9999, display: "flex", flexDirection: "column", gap: 8,
+      pointerEvents: "none", width: "min(420px, 92vw)",
+    }}>
+      {toasts.map(toast => {
+        const colors: Record<ToastType, { bg: string; border: string; text: string }> = {
+          gold:  { bg: "rgba(20,15,5,0.97)",  border: "#c9a84c", text: "#f0d080" },
+          green: { bg: "rgba(5,20,10,0.97)",  border: "#3a8a5a", text: "#5dba7e" },
+          red:   { bg: "rgba(20,5,5,0.97)",   border: "#8a2a2a", text: "#e07b6f" },
+        };
+        const c = colors[toast.type];
+        return (
+          <div key={toast.id} style={{
+            background: c.bg, border: `1px solid ${c.border}`,
+            borderRadius: 10, padding: "12px 16px",
+            boxShadow: `0 0 20px ${c.border}44, 0 4px 24px rgba(0,0,0,0.6)`,
+            pointerEvents: "auto", cursor: "pointer",
+            animation: "toastIn 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+          }} onClick={() => onDismiss(toast.id)}>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: c.text, fontFamily: "monospace" }}>
+              {toast.text}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Page() {
   const [hydrated, setHydrated] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -2361,6 +2449,26 @@ export default function Page() {
   const [showSplash, setShowSplash] = useState(false);
   const [splashDone, setSplashDone] = useState(() => typeof window !== "undefined" && !!sessionStorage.getItem("mp_splash_shown"));
   const [musicMuted, setMusicMuted] = useState(true);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const toastIdRef = useRef(0);
+  const prevMastersLeader = useRef<string | null>(null);
+  const prevPoolLeader = useRef<string | null>(null);
+  const prevR4Scores = useRef<Record<string, number | null>>({});
+  const prevStandingsPos = useRef<Record<string, number>>({});
+  const birdieStreakCount = useRef<Record<string, number>>({});
+  const winnerDeclared = useRef(false);
+  const isFirstFetch = useRef(true);
+
+  function pushToast(type: ToastType, text: string) {
+    const id = ++toastIdRef.current;
+    setToasts(q => [...q, { id, type, text }]);
+    setTimeout(() => setToasts(q => q.filter(t => t.id !== id)), 5000);
+  }
+  function dismissToast(id: number) {
+    setToasts(q => q.filter(t => t.id !== id));
+  }
   const musicRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize audio once
@@ -2450,13 +2558,171 @@ export default function Page() {
         safeJson(pickStatusRes, { status: {} }),
       ]);
 
-      setPicks(picksData.picks ?? []);
-      setScores(scoresData.scores ?? []);
+      const newPicks: Pick[] = picksData.picks ?? [];
+      const newScores: GolferScore[] = scoresData.scores ?? [];
+      const newUsers: {id: string; username: string}[] = usersData.users ?? [];
+
+      setPicks(newPicks);
+      setScores(newScores);
       setOdds(oddsData.odds ?? {});
       setPlayerCount(playersData.count ?? 0);
-      setRegisteredUsers(usersData.users ?? []);
+      setRegisteredUsers(newUsers);
       setAdminOverrides(overridesData ?? {});
       setPickStatus(pickStatusData.status ?? {});
+
+      // ── Notification detection (skip on first fetch — no "prev" to compare) ──
+      if (!isFirstFetch.current && newScores.length > 0) {
+        const newOverrides = (overridesData ?? {}) as Record<string, unknown>;
+        const activeRound = (newOverrides.roundOverride as number) ?? getCurrentRound(tournament);
+
+        const scoreMap = Object.fromEntries(newScores.map(s => [s.name, s]));
+
+        // 1. Masters leaderboard leader change
+        const mastersLeader = [...newScores]
+          .filter(s => s.status === "active" && s.r1 !== null)
+          .sort((a, b) => a.totalScore - b.totalScore)[0];
+        if (mastersLeader && mastersLeader.name !== prevMastersLeader.current) {
+          if (prevMastersLeader.current !== null) {
+            const score = mastersLeader.totalScore === 0 ? "E" : mastersLeader.totalScore > 0 ? `+${mastersLeader.totalScore}` : `${mastersLeader.totalScore}`;
+            pushToast("gold", `🏆 ${mastersLeader.name} takes the Masters lead at ${score}`);
+          }
+          prevMastersLeader.current = mastersLeader.name;
+        }
+
+        // 2. Pick'em pool leader change — compute standings
+        const userMap: Record<string, string> = {};
+        newUsers.forEach(u => { userMap[u.id] = u.username; });
+        newPicks.forEach(p => { userMap[p.user_id] = p.username; });
+
+        const standings = Object.entries(userMap).map(([uid, uname]) => {
+          let total = 0;
+          for (let r = 1; r <= 4; r++) {
+            const rPicks = newPicks.filter(p => p.user_id === uid && p.round_number === r).map(p => p.golfer);
+            if (!rPicks.length) continue;
+            const roundScores = rPicks.map(g => getRoundScore(scoreMap[g], r));
+            total += calcRoundScore(roundScores, r);
+          }
+          return { uid, username: uname, total };
+        }).sort((a, b) => {
+          if (a.total !== b.total) return a.total - b.total;
+          if (a.username === "Trenton Patterson") return -1;
+          if (b.username === "Trenton Patterson") return 1;
+          return a.username.localeCompare(b.username);
+        });
+
+        const poolLeader = standings[0]?.username ?? null;
+        if (poolLeader && poolLeader !== prevPoolLeader.current) {
+          if (prevPoolLeader.current !== null) {
+            const leader = standings[0];
+            const score = leader.total === 0 ? "E" : leader.total > 0 ? `+${leader.total}` : `${leader.total}`;
+            pushToast("green", `🏆 ${poolLeader} takes the lead in the pool at ${score}!`);
+          }
+          prevPoolLeader.current = poolLeader;
+        }
+
+        // 3. Top-3 pick'em user's golfer goes over par in R4
+        if (activeRound === 4) {
+          const top3Uids = new Set(standings.slice(0, 3).map(s => s.uid));
+          const jokes = BOGEY_JOKES;
+
+          top3Uids.forEach(uid => {
+            const uname = userMap[uid];
+            const r4picks = newPicks.filter(p => p.user_id === uid && p.round_number === 4).map(p => p.golfer);
+            r4picks.forEach(golfer => {
+              const gs = scoreMap[golfer];
+              if (!gs) return;
+              const currentR4 = gs.r4;
+              const prevR4 = prevR4Scores.current[golfer] ?? null;
+              const thru = gs.thru;
+
+              // Detect bogey or worse: R4 score got worse (higher) since last check
+              if (currentR4 !== null && prevR4 !== null && currentR4 > prevR4) {
+                const joke = jokes[Math.floor(Math.random() * jokes.length)];
+                const holeInfo = thru && thru !== "F" ? ` on hole ${thru}` : "";
+                const r4Str = currentR4 === 0 ? "E" : currentR4 > 0 ? `+${currentR4}` : `${currentR4}`;
+                pushToast("red", `💩 ${uname} ${joke} — their pick ${golfer} just bogeyed${holeInfo} (R4: ${r4Str})`);
+              }
+            });
+          });
+
+          // ── Eagle alert: any picked golfer's R4 drops by 2+ in one refresh ──
+          const allR4Golfers = new Set(newPicks.filter(p => p.round_number === 4).map(p => p.golfer));
+          allR4Golfers.forEach(golfer => {
+            const gs = scoreMap[golfer];
+            if (!gs) return;
+            const currentR4 = gs.r4;
+            const prevR4 = prevR4Scores.current[golfer] ?? null;
+            if (currentR4 !== null && prevR4 !== null && (prevR4 - currentR4) >= 2) {
+              const picker = newPicks.find(p => p.golfer === golfer && p.round_number === 4);
+              const pickerName = picker ? userMap[picker.user_id] ?? picker.username : "Someone";
+              const line = EAGLE_LINES[Math.floor(Math.random() * EAGLE_LINES.length)];
+              const thru = gs.thru && gs.thru !== "F" ? ` on hole ${gs.thru}` : "";
+              pushToast("gold", `🦅 ${line} ${pickerName}'s pick ${golfer} just made EAGLE${thru}!`);
+            }
+          });
+
+          // ── Birdie streak: R4 score improved 2 refreshes in a row ──
+          allR4Golfers.forEach(golfer => {
+            const gs = scoreMap[golfer];
+            if (!gs) return;
+            const currentR4 = gs.r4;
+            const prevR4 = prevR4Scores.current[golfer] ?? null;
+            if (currentR4 !== null && prevR4 !== null && currentR4 < prevR4) {
+              birdieStreakCount.current[golfer] = (birdieStreakCount.current[golfer] ?? 0) + 1;
+              if (birdieStreakCount.current[golfer] === 2) {
+                const picker = newPicks.find(p => p.golfer === golfer && p.round_number === 4);
+                const pickerName = picker ? userMap[picker.user_id] ?? picker.username : "Someone";
+                const line = BIRDIE_STREAK_LINES[Math.floor(Math.random() * BIRDIE_STREAK_LINES.length)];
+                pushToast("green", `🔥 ${pickerName}'s pick ${golfer} ${line} — back-to-back birdies in R4!`);
+                birdieStreakCount.current[golfer] = 0; // reset so it doesn't spam
+              }
+            } else {
+              birdieStreakCount.current[golfer] = 0; // broke the streak
+            }
+          });
+
+          // Update R4 score tracking
+          newScores.forEach(s => { prevR4Scores.current[s.name] = s.r4; });
+
+          // ── Comeback / collapse: standings position changed 3+ spots ──
+          standings.forEach((u, newPos) => {
+            const prevPos = prevStandingsPos.current[u.uid];
+            if (prevPos === undefined) return;
+            const diff = prevPos - newPos; // positive = moved up
+            if (diff >= 3) {
+              const line = COMEBACK_LINES[Math.floor(Math.random() * COMEBACK_LINES.length)];
+              pushToast("green", `🚀 ${u.username} ${line} — jumped from ${prevPos + 1} to ${newPos + 1} in the pool`);
+            } else if (diff <= -3) {
+              const line = COLLAPSE_LINES[Math.floor(Math.random() * COLLAPSE_LINES.length)];
+              pushToast("red", `📉 ${u.username} ${line} — dropped from ${prevPos + 1} to ${newPos + 1} in the pool`);
+            }
+          });
+          standings.forEach((u, i) => { prevStandingsPos.current[u.uid] = i; });
+
+          // ── Winner declaration: leader 5+ ahead, all pool users' R4 picks thru 15+ ──
+          if (!winnerDeclared.current && standings.length >= 2) {
+            const gap = standings[1].total - standings[0].total;
+            // Only check the actual picks in play — not all 91 Masters players
+            const allPoolR4Picks = new Set(newPicks.filter(p => p.round_number === 4).map(p => p.golfer));
+            const allPicksLate = Array.from(allPoolR4Picks).every(golfer => {
+              const gs = scoreMap[golfer];
+              if (!gs) return true;
+              if (gs.status !== "active" || gs.r4 === null) return true; // finished or WD
+              const thru = parseInt(gs.thru ?? "0", 10);
+              return isNaN(thru) || thru >= 15;
+            });
+            if (gap >= 5 && allPicksLate) {
+              const winner = standings[0];
+              const score = winner.total === 0 ? "E" : winner.total > 0 ? `+${winner.total}` : `${winner.total}`;
+              const line = WINNER_LINES[Math.floor(Math.random() * WINNER_LINES.length)];
+              pushToast("gold", `👑 ${line} ${winner.username} wins the pool at ${score}. Everyone else was playing for second.`);
+              winnerDeclared.current = true;
+            }
+          }
+        }
+      }
+
+      isFirstFetch.current = false;
     } catch (err) {
       if ((err as Error).name !== "AbortError") console.warn("fetchData error:", err);
     } finally {
@@ -2554,6 +2820,9 @@ export default function Page() {
           </button>
         ))}
       </div>
+
+      {/* Toast notifications */}
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
       {/* Pool usage ticker */}
       <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} />

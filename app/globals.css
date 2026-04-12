@@ -137,3 +137,9 @@ img { max-width: 100%; height: auto; }
   background: #061210;
   border-bottom: 1px solid rgba(201,168,76,0.2);
 }
+
+/* ── Toast notifications ──────────────────────────────────── */
+@keyframes toastIn {
+  0%   { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
