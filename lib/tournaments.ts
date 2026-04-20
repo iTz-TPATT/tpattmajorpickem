@@ -167,13 +167,34 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
 export function getActiveTournament(): Tournament {
   const now = new Date();
   const list = Object.values(TOURNAMENTS);
+
+  // If currently inside a tournament window, use that
   for (const t of list) {
     const start = new Date(t.rounds[1].date + "T00:00:00Z");
     const end = new Date(t.rounds[4].date + "T23:59:59Z");
     if (now >= start && now <= end) return t;
   }
-  const upcoming = list.filter((t) => new Date(t.rounds[1].date + "T00:00:00Z") > now)
+
+  // Stay on most recently completed tournament until 7 days before the next one
+  const completed = list
+    .filter(t => new Date(t.rounds[4].date + "T23:59:59Z") < now)
+    .sort((a, b) => new Date(b.rounds[4].date).getTime() - new Date(a.rounds[4].date).getTime());
+
+  const upcoming = list
+    .filter(t => new Date(t.rounds[1].date + "T00:00:00Z") > now)
     .sort((a, b) => new Date(a.rounds[1].date).getTime() - new Date(b.rounds[1].date).getTime());
+
+  if (completed.length > 0) {
+    const lastCompleted = completed[0];
+    if (upcoming.length > 0) {
+      const nextStart = new Date(upcoming[0].rounds[1].date + "T00:00:00Z");
+      const daysUntilNext = (nextStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysUntilNext > 7) return lastCompleted;
+    } else {
+      return lastCompleted;
+    }
+  }
+
   if (upcoming.length > 0) return upcoming[0];
   return TOURNAMENTS.theopen;
 }

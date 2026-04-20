@@ -165,10 +165,25 @@ export async function GET(request: Request) {
     });
   }
 
-  // Serve cached scores if fresh
+  // Serve cached scores
   const { data: cached } = await supabase
     .from("score_cache").select("data, updated_at").eq("tournament", `scores_${tournament}`).single();
   const cachedScores = Array.isArray(cached?.data) ? cached!.data as GolferScore[] : [];
+
+  // If tournament is over, always serve final cached scores — never hit ESPN again
+  const TOURNAMENT_END_DATES: Record<string, string> = {
+    masters: "2026-04-12T23:59:59Z",
+    pga:     "2026-05-24T23:59:59Z",
+    usopen:  "2026-06-21T23:59:59Z",
+    theopen: "2026-07-19T23:59:59Z",
+  };
+  const endDate = TOURNAMENT_END_DATES[tournament];
+  const tournamentOver = endDate ? new Date() > new Date(endDate) : false;
+
+  if (tournamentOver && cachedScores.length > 0) {
+    if (debug) return NextResponse.json({ scores: cachedScores, source: "final_cache", count: cachedScores.length });
+    return NextResponse.json({ scores: cachedScores, source: "final_cache" });
+  }
 
   if (!debug && cachedScores.length > 0) {
     const age = Date.now() - new Date(cached!.updated_at as string).getTime();
@@ -177,7 +192,7 @@ export async function GET(request: Request) {
     }
   }
 
-  // Live fetch
+  // Live fetch from ESPN
   const live = await fetchFromESPN();
 
   if (live.length > 0) {
@@ -190,7 +205,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ scores: live, source: "espn", count: live.length });
   }
 
-  // Stale cache
+  // Stale cache fallback
   if (cachedScores.length > 0) {
     if (debug) return NextResponse.json({ scores: cachedScores, source: "stale_cache", count: cachedScores.length });
     return NextResponse.json({ scores: cachedScores, source: "stale_cache" });
