@@ -794,14 +794,13 @@ function MyPicksTab({
   onPicksChanged: () => void;
 }) {
   const round = currentRound;
-  // Always auto-advance to next round when current round is locked (tee times started)
-  // and admin hasn't explicitly unlocked it via skipDeadline.
-  // e.g. during R2 (locked) → show R3 picks form automatically.
-  // When admin sets roundOverride + skipDeadline, that combo keeps the current round open.
+  // isRoundRevealed checks if the reveal time (8am CT) has passed.
+  // Only auto-advance if the CURRENT round's deadline has passed AND skipDeadline is off.
+  // Never advance if the tournament hasn't started yet (round 1 deadline hasn't passed).
   const currentRevealed = isRoundRevealed(tournament, round);
-  const displayRound = (currentRevealed && !skipDeadline && round < 4) ? round + 1 : round;
+  const tournamentStarted = isRoundRevealed(tournament, 1);
+  const displayRound = (tournamentStarted && currentRevealed && !skipDeadline && round < 4) ? round + 1 : round;
   const roundDeadlinePassed = isRoundRevealed(tournament, displayRound);
-  // skipDeadline (from admin) forces the form open regardless of clock time
   const revealed = roundDeadlinePassed && !revealAll && !skipDeadline;
   const revealDate = new Date(tournament.rounds[displayRound as 1|2|3|4].revealTimeUTC);
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
@@ -1099,10 +1098,15 @@ function LeaderboardTab({
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
   const purse = playerCount * 50;
 
-  // Build userMap from BOTH picks AND registered users
+  // Build userMap from registered users + picks + pickStatus keys
+  // pickStatus always has all users who have ever submitted picks
   const userMap: Record<string, string> = {};
   registeredUsers.forEach((u) => { userMap[u.id] = u.username; });
-  allPicks.forEach((p) => { userMap[p.user_id] = p.username; });
+  allPicks.forEach((p) => { userMap[p.user_id] = p.username ?? userMap[p.user_id] ?? p.user_id; });
+  // If registeredUsers is empty but pickStatus has users, still show them
+  Object.keys(pickStatus).forEach(uid => {
+    if (!userMap[uid]) userMap[uid] = uid; // fallback to uid until username loads
+  });
 
   // Use pickStatus (from /api/pick-status) which shows all rounds regardless of reveal time
   // This ensures green checkmarks always reflect actual submission state
@@ -2515,7 +2519,18 @@ export default function Page() {
       setScores(newScores);
       setOdds(oddsData.odds ?? {});
       setPlayerCount(playersData.count ?? 0);
-      setRegisteredUsers(newUsers);
+      // If users came back empty, retry once directly
+      if (newUsers.length === 0) {
+        try {
+          const retry = await fetch("/api/users", { headers: { Authorization: `Bearer ${t}` } });
+          if (retry.ok) {
+            const rd = await retry.json();
+            setRegisteredUsers(rd.users ?? []);
+          }
+        } catch { /* ignore */ }
+      } else {
+        setRegisteredUsers(newUsers);
+      }
       setAdminOverrides(overridesData ?? {});
       setPickStatus(pickStatusData.status ?? {});
 
