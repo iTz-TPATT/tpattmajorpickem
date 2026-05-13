@@ -1,0 +1,145 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #071510;
+  color: #f0e9d6;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 16px;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+}
+
+button, input {
+  font-family: 'EB Garamond', Georgia, serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f2318; }
+::-webkit-scrollbar-thumb { background: #1a3a28; border-radius: 3px; }
+
+/* ── Mobile responsive fixes ─────────────────────────────── */
+
+/* Scrollable tab bar */
+.tab-nav {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0 12px;
+}
+.tab-nav::-webkit-scrollbar { display: none; }
+.tab-nav button { flex-shrink: 0; padding: 13px 14px; font-size: 13px; }
+
+/* Tighter content padding on mobile */
+@media (max-width: 480px) {
+  main { padding: 16px 12px !important; }
+  .tab-nav button { padding: 12px 10px; font-size: 12px; }
+}
+
+/* Leaderboard — hide R2/R3/R4 on small screens, show only R1 + TOTAL */
+.lb-grid-header,
+.lb-grid-row {
+  display: grid;
+  grid-template-columns: 30px 30px 1fr 40px 40px 40px 40px 52px;
+  align-items: center;
+  gap: 2px;
+}
+
+@media (max-width: 500px) {
+  .lb-grid-header,
+  .lb-grid-row {
+    grid-template-columns: 26px 26px 1fr 36px 36px 36px 36px 46px;
+    gap: 1px;
+  }
+  .lb-grid-header > div,
+  .lb-grid-row > div {
+    font-size: 11px !important;
+  }
+  .lb-name { font-size: 13px !important; }
+  .lb-round-score { font-size: 11px !important; }
+  .lb-total { font-size: 13px !important; }
+}
+
+/* Tournament leaderboard same treatment */
+.tlb-grid-header,
+.tlb-grid-row {
+  display: grid;
+  grid-template-columns: 38px 1fr 44px 44px 44px 44px 58px;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 500px) {
+  .tlb-grid-header,
+  .tlb-grid-row {
+    grid-template-columns: 30px 1fr 32px 32px 32px 32px 44px;
+    gap: 2px;
+  }
+  .tlb-grid-header > div,
+  .tlb-grid-row > div {
+    font-size: 11px !important;
+  }
+}
+
+/* Picks tab — golfer cards grid */
+@media (max-width: 480px) {
+  .golfer-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Tighter header on mobile */
+@media (max-width: 480px) {
+  .tab-nav { top: 60px !important; }
+}
+
+/* Prevent horizontal overflow everywhere */
+* { max-width: 100%; }
+img { max-width: 100%; height: auto; }
+
+/* Leaderboard round score columns — smaller text on mobile */
+@media (max-width: 450px) {
+  .lb-r-col { font-size: 11px !important; }
+}
+
+/* Leaderboard round score cells — smaller on mobile */
+@media (max-width: 430px) {
+  .lb-grid-header > div,
+  .lb-grid-row > div { font-size: 10px !important; }
+  .tlb-grid-header > div,
+  .tlb-grid-row > div { font-size: 10px !important; }
+}
+
+/* ── Score Ticker ─────────────────────────────────────────── */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-track {
+  display: flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  width: max-content;
+  animation: ticker-scroll 12s linear infinite;
+  will-change: transform;
+}
+.ticker-track:hover { animation-play-state: paused; }
+.ticker-wrap {
+  overflow: hidden;
+  width: 100%;
+  background: #061210;
+  border-bottom: 1px solid rgba(201,168,76,0.2);
+}
+
+/* ── Toast notifications ──────────────────────────────────── */
+@keyframes toastIn {
+  0%   { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
