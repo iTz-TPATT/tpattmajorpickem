@@ -2463,6 +2463,15 @@ export default function Page() {
   function handleUnmute() {}
   function handleMuteToggle() {}
   const tournament = getActiveTournament();
+  // Compute current round — never show R4 before the tournament starts
+  const computedRound = (() => {
+    const override = adminOverrides.roundOverride;
+    if (override) return override;
+    const now = new Date();
+    const r1Start = new Date(tournament.rounds[1].date + "T11:00:00Z"); // 6am CT = 11am UTC
+    if (now < r1Start) return 1; // Pre-tournament: always R1
+    return getCurrentRound(tournament);
+  })();
   const th = tournament.theme;
 
   useEffect(() => {
@@ -2794,10 +2803,10 @@ export default function Page() {
       {/* Content */}
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
         {tab === "picks" && token && userId && (
-          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
+          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={computedRound} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} pickStatus={pickStatus} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={computedRound} pickStatus={pickStatus} />
         )}
         {tab === "tournament" && (
           <TournamentLeaderboardTab scores={scores} />

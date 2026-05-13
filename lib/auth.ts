@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 export interface TokenPayload { userId: string; username: string; }
 
 export function signToken(p: TokenPayload) {
-  return jwt.sign(p, process.env.JWT_SECRET!, { expiresIn: "7d" });
+  return jwt.sign(p, process.env.JWT_SECRET!, { expiresIn: "30d" });
 }
 
 export function verifyToken(token: string): TokenPayload | null {
