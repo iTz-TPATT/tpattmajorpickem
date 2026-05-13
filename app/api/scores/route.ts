@@ -115,8 +115,8 @@ async function fetchFromESPN(): Promise<GolferScore[]> {
   // Try specific Masters 2026 event ID first (returns full 91-player field)
   // Fall back to generic PGA endpoint
   const urls = [
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811941",
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga", // generic — always returns current live event
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401580365", // PGA Championship 2026 Aronimink
     "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
   ];
   for (const url of urls) {
@@ -173,7 +173,7 @@ export async function GET(request: Request) {
   // If tournament is over, always serve final cached scores — never hit ESPN again
   const TOURNAMENT_END_DATES: Record<string, string> = {
     masters: "2026-04-12T23:59:59Z",
-    pga:     "2026-05-24T23:59:59Z",
+    pga:     "2026-05-17T23:59:59Z",
     usopen:  "2026-06-21T23:59:59Z",
     theopen: "2026-07-19T23:59:59Z",
   };

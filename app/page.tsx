@@ -1159,10 +1159,7 @@ function LeaderboardTab({
     return (
       <div style={card}>
         <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 16 }}>
-          Standings will appear once picks are submitted and revealed.
-        </p>
-        <p style={{ color: "var(--cream-dim)", fontSize: 12, textAlign: "center", padding: "0 16px 16px" }}>
-          If you&apos;re testing: go to Admin → 🧪 Enable Full Test Mode, have all users submit picks, then Fill &amp; Save manual scores.
+          No picks submitted yet. Standings will populate once picks are revealed.
         </p>
       </div>
     );
@@ -1234,10 +1231,11 @@ function LeaderboardTab({
         {standings.map((u, i) => {
           const isOpen = expanded === u.uid;
           const isLeader = i === 0;
+          const hasNoPicks = Object.keys(u.rounds).length === 0;
           // True rank = number of players with a strictly better score + 1
           const trueRank = standings.filter(s => s.total < u.total).length + 1;
           const isTied = standings.filter(s => s.total === u.total).length > 1;
-          const posLabel = isTied ? `T${trueRank}` : `${trueRank}`;
+          const posLabel = hasNoPicks ? "—" : (isTied ? `T${trueRank}` : `${trueRank}`);
 
           return (
             <div key={u.uid} style={{ borderBottom: i < standings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
@@ -1340,11 +1338,11 @@ function LeaderboardTab({
                 {/* Total */}
                 <div style={{
                   textAlign: "center" as const, fontFamily: "monospace", fontSize: 17, fontWeight: 700,
-                  color: mastersColor(u.total),
-                  background: isLeader ? "rgba(192,57,43,0.12)" : "transparent",
+                  color: hasNoPicks ? "rgba(255,255,255,0.25)" : mastersColor(u.total),
+                  background: isLeader && !hasNoPicks ? "rgba(192,57,43,0.12)" : "transparent",
                   borderRadius: 4, padding: "2px 4px",
                 }}>
-                  {mastersScore(u.total)}
+                  {hasNoPicks ? <span style={{ fontSize: 11, letterSpacing: "0.06em" }}>NO PICKS</span> : mastersScore(u.total)}
                 </div>
               </button>
 

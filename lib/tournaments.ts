@@ -86,25 +86,45 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
   },
   pga: {
     id: "pga", name: "PGA Championship", shortName: "PGA Championship",
-    location: "Quail Hollow Club · Charlotte, NC", year: 2026,
+    location: "Aronimink Golf Club · Newtown Square, PA", year: 2026,
     rounds: {
-      1: { date: "2026-05-21", revealTimeUTC: "2026-05-21T12:00:00Z" },
-      2: { date: "2026-05-22", revealTimeUTC: "2026-05-22T12:00:00Z" },
-      3: { date: "2026-05-23", revealTimeUTC: "2026-05-23T13:30:00Z" },
-      4: { date: "2026-05-24", revealTimeUTC: "2026-05-24T13:30:00Z" },
+      1: { date: "2026-05-14", revealTimeUTC: "2026-05-14T13:00:00Z" },
+      2: { date: "2026-05-15", revealTimeUTC: "2026-05-15T13:00:00Z" },
+      3: { date: "2026-05-16", revealTimeUTC: "2026-05-16T13:00:00Z" },
+      4: { date: "2026-05-17", revealTimeUTC: "2026-05-17T13:00:00Z" },
     },
     priorChampion: { name: "Wyatt T.O. Robson", year: 2025 },
     theme: {
-      bg: "#060d1f", bgDark: "#0d1a35", bgMid: "#1a2d55",
-      accent: "#8facd4", accentLight: "#b8cee6",
-      cream: "#e8eef5", creamDim: "#8a9eb8",
-      cardBg: "rgba(255,255,255,0.04)", cardBorder: "rgba(143,172,212,0.2)",
-      scoreLow: "#5dba9e", scoreHigh: "#e07b6f", emoji: "🏆",
-      gradient: "linear-gradient(135deg,#060d1f 0%,#0d1a35 50%,#060d1f 100%)",
+      bg: "#05080f", bgDark: "#0a1020", bgMid: "#112040",
+      accent: "#c9a84c", accentLight: "#e2c97e",
+      cream: "#e8eef8", creamDim: "#8a9ab8",
+      cardBg: "rgba(255,255,255,0.04)", cardBorder: "rgba(201,168,76,0.22)",
+      scoreLow: "#5dba7e", scoreHigh: "#e07b6f", emoji: "🏆",
+      gradient: "linear-gradient(135deg,#05080f 0%,#0a1020 50%,#05080f 100%)",
       photos: [
         {
-          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Quail_Hollow_Club_18th_hole.jpg",
-          caption: "18th Hole — The Green Mile · Quail Hollow Club",
+          url: "/courses/aronimink-trophy.jpg",
+          caption: "Wanamaker Trophy · Aronimink Golf Club · Newtown Square, PA",
+        },
+        {
+          url: "/courses/scheffler-pga.jpg",
+          caption: "Scottie Scheffler · 2026 PGA Championship",
+        },
+        {
+          url: "/courses/rory-pga.jpg",
+          caption: "Rory McIlroy · Aronimink Golf Club",
+        },
+        {
+          url: "/courses/jt-thomas.jpg",
+          caption: "Justin Thomas · PGA Championship",
+        },
+        {
+          url: "/courses/aronimink-bridge.png",
+          caption: "Wanamaker Trophy · Aronimink Golf Club",
+        },
+        {
+          url: "/courses/wanamaker-trophy.jpg",
+          caption: "The Wanamaker Trophy · Aronimink Golf Club",
         },
       ],
     },
@@ -189,7 +209,7 @@ export function getActiveTournament(): Tournament {
     if (upcoming.length > 0) {
       const nextStart = new Date(upcoming[0].rounds[1].date + "T00:00:00Z");
       const daysUntilNext = (nextStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysUntilNext > 7) return lastCompleted;
+      if (daysUntilNext > 10) return lastCompleted;
     } else {
       return lastCompleted;
     }
