@@ -2069,13 +2069,19 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 
 // ─── Round Leader Banner ──────────────────────────────────────────────────────
 // ─── Pool Usage Ticker ────────────────────────────────────────────────────────
-function PoolUsageTicker({ picks, registeredUsers }: { picks: Pick[]; registeredUsers: { id: string; username: string }[] }) {
+function PoolUsageTicker({ picks, registeredUsers, tournament }: { picks: Pick[]; registeredUsers: { id: string; username: string }[]; tournament: Tournament }) {
   const totalUsers = registeredUsers.length;
-  if (!totalUsers || !picks.length) return null;
+  if (!totalUsers) return null;
 
-  // Count how many distinct users have picked each golfer across all rounds
+  // Only count picks from revealed rounds — don't spoil unrevealed picks
+  const revealedRounds = [1, 2, 3, 4].filter(r => isRoundRevealed(tournament, r));
+  const revealedPicks = picks.filter(p => revealedRounds.includes(p.round_number));
+
+  if (!revealedPicks.length) return null;
+
+  // Count how many distinct users have picked each golfer across revealed rounds
   const golferUsers: Record<string, Set<string>> = {};
-  picks.forEach(p => {
+  revealedPicks.forEach(p => {
     if (!golferUsers[p.golfer]) golferUsers[p.golfer] = new Set();
     golferUsers[p.golfer].add(p.user_id);
   });
@@ -2798,7 +2804,7 @@ export default function Page() {
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
       {/* Pool usage ticker */}
-      <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} />
+      <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} tournament={tournament} />
 
       {/* Content */}
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
