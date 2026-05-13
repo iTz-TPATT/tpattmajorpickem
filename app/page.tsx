@@ -1159,11 +1159,11 @@ function LeaderboardTab({
     return Math.round((golferPickCount[golfer].size / totalUsersInPool) * 100);
   };
 
-  if (!standings.length) {
+  if (!standings.length && registeredUsers.length === 0) {
     return (
       <div style={card}>
         <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 16 }}>
-          No picks submitted yet. Standings will populate once picks are revealed.
+          Loading participants…
         </p>
       </div>
     );
