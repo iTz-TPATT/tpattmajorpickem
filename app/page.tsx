@@ -1121,8 +1121,8 @@ function LeaderboardTab({
   currentRound: number; pickStatus: Record<string, number[]>;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [hideNoPicks, setHideNoPicks] = useState(false);
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
-  const purse = playerCount * 50;
 
   // Build userMap from registered users + picks + pickStatus keys
   // pickStatus always has all users who have ever submitted picks
@@ -1215,10 +1215,17 @@ function LeaderboardTab({
   const latestRound = standings.length > 0
     ? Math.max(...standings.flatMap(u => Object.keys(u.rounds).map(Number)), 0)
     : 0;
+  const r1Revealed = isRoundRevealed(tournament, 1);
+  const activeCount = standings.filter(u => Object.keys(u.rounds).length > 0).length;
+  const displayPlayerCount = hideNoPicks && r1Revealed ? activeCount : playerCount;
+  const purse = displayPlayerCount * 50;
+  // When hiding, only show users who have picks in at least one revealed round
+  const visibleStandings = hideNoPicks && r1Revealed
+    ? standings.filter(u => Object.keys(u.rounds).length > 0)
+    : standings;
 
   return (
     <div style={{ fontFamily: "'EB Garamond', serif" }}>
-
       {/* Masters-style header bar */}
       <div style={{
         background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
@@ -1234,8 +1241,19 @@ function LeaderboardTab({
             <div style={{ fontSize: 22, color: "#c9a84c", fontFamily: "Playfair Display, serif", fontWeight: 600 }}>${purse.toLocaleString()}</div>
           </div>
           <div style={{ textAlign: "right" as const }}>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{playerCount} players · $50 buy-in</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{displayPlayerCount} players · $50 buy-in</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2, fontStyle: "italic" }}>Lowest cumulative score wins</div>
+            {r1Revealed && (
+              <button onClick={() => setHideNoPicks(h => !h)} style={{
+                marginTop: 6, fontSize: 10, padding: "3px 10px", borderRadius: 12,
+                background: hideNoPicks ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${hideNoPicks ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.15)"}`,
+                color: hideNoPicks ? "#c9a84c" : "rgba(255,255,255,0.4)",
+                cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" as const,
+              }}>
+                {hideNoPicks ? "👁 Showing active" : "Hide no picks"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1261,17 +1279,16 @@ function LeaderboardTab({
 
       {/* Standings rows */}
       <div style={{ border: "1px solid #2d6b40", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden", marginBottom: 16 }}>
-        {standings.map((u, i) => {
+        {visibleStandings.map((u, i) => {
           const isOpen = expanded === u.uid;
-          const isLeader = i === 0;
           const hasNoPicks = Object.keys(u.rounds).length === 0;
-          // True rank = number of players with a strictly better score + 1
-          const trueRank = standings.filter(s => s.total < u.total).length + 1;
-          const isTied = standings.filter(s => s.total === u.total).length > 1;
+          const isLeader = i === 0 && !hasNoPicks;
+          const trueRank = standings.filter(s => s.total < u.total && Object.keys(s.rounds).length > 0).length + 1;
+          const isTied = standings.filter(s => s.total === u.total && Object.keys(s.rounds).length > 0).length > 1;
           const posLabel = hasNoPicks ? "—" : (isTied ? `T${trueRank}` : `${trueRank}`);
 
           return (
-            <div key={u.uid} style={{ borderBottom: i < standings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+            <div key={u.uid} style={{ borderBottom: i < visibleStandings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
               {/* Main row */}
               <button
                 onClick={() => setExpanded(isOpen ? null : u.uid)}
