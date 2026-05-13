@@ -8,7 +8,7 @@ export interface GolferScore {
   name: string; espnId: string; headshot: string | null;
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
-  teeTime: string | null; thru: string | null;
+  teeTime: string | null; thru: string | null; worldRank: number | null;
 }
 
 const PAR = 72; // Masters par
@@ -92,6 +92,9 @@ function parseESPN(data: unknown): GolferScore[] {
       const name = (athlete.displayName as string) ?? "";
       if (!name) continue;
 
+      const rankRaw = (athlete.ranking ?? comp.ranking) as unknown;
+      const worldRank = rankRaw != null ? parseInt(String(rankRaw), 10) || null : null;
+
       players.push({
         name,
         espnId: String(athlete.id ?? ""),
@@ -103,6 +106,7 @@ function parseESPN(data: unknown): GolferScore[] {
         r1: rounds[0], r2: rounds[1], r3: rounds[2], r4: rounds[3],
         teeTime,
         thru: thru != null ? String(thru) : null,
+        worldRank,
       });
     }
   } catch (e) {

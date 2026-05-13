@@ -5,7 +5,7 @@ import {
   TOURNAMENTS, getActiveTournament, getCurrentRound, isRoundRevealed,
   isTournamentStarted, calcRoundScore, ROUND_LABELS, Tournament, TournamentId,
 } from "@/lib/tournaments";
-
+import { OWGR_RANKINGS } from "@/lib/golfers";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Pick { username: string; user_id: string; round_number: number; golfer: string; }
 interface GolferScore {
@@ -14,6 +14,7 @@ interface GolferScore {
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
   teeTime: string | null;
   thru: string | null;
+  worldRank: number | null;
 }
 type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom";
 
@@ -414,11 +415,11 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
 
 // ─── Golfer Card ──────────────────────────────────────────────────────────────
 function GolferCard({
-  name, score, selected, burned, cut, disabled, odds, espnId, headshot, usagePct, onClick,
+  name, score, selected, burned, cut, disabled, odds, espnId, headshot, usagePct, sortMode, onClick,
 }: {
   name: string; score: GolferScore | undefined; selected: boolean; burned: boolean;
   cut: boolean; disabled: boolean; odds: string; espnId: string; headshot: string | null;
-  usagePct: number | null;
+  usagePct: number | null; sortMode: "alpha" | "leaderboard" | "world";
   onClick: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
@@ -491,7 +492,11 @@ function GolferCard({
             {burned && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", color: "var(--cream-dim)", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>USED</span>}
             {cut && <span style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "#e07b6f", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>CUT</span>}
             {odds && !burned && !cut && <span style={{ fontSize: 11, color: "var(--accent-light, var(--accent))", opacity: 0.8 }}>{odds}</span>}
-            {score?.position && !burned && !cut && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+            {score?.position && !burned && !cut && sortMode !== "world" && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+            {sortMode === "world" && !burned && !cut && (() => {
+              const wr = score?.worldRank ?? OWGR_RANKINGS[name] ?? null;
+              return wr ? <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>#{wr} WR</span> : null;
+            })()}
             {usagePct !== null && !burned && !cut && (
               <span style={{
                 fontSize: 10, padding: "1px 5px", borderRadius: 4,
@@ -835,7 +840,7 @@ function MyPicksTab({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saved, setSaved] = useState(false);
-  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha">("alpha");
+  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha" | "world">("alpha");
   const [searchQuery, setSearchQuery] = useState("");
 
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
@@ -912,12 +917,32 @@ function MyPicksTab({
       if (aAvail && !bAvail) return -1;
       if (!aAvail && bAvail) return 1;
       if (sortMode === "alpha") {
-        // Sort by first name
         const aFirst = a.name.split(" ")[0] ?? a.name;
         const bFirst = b.name.split(" ")[0] ?? b.name;
         return aFirst.localeCompare(bFirst);
       }
-      return a.totalScore - b.totalScore;
+      // Rank sort: use ESPN position string as primary (most accurate)
+      // Players who haven't started (r1 null) go to the bottom
+      if (sortMode === "world") {
+        // World ranking: ESPN worldRank first, fall back to static OWGR lookup
+        const aRank = a.worldRank ?? OWGR_RANKINGS[a.name] ?? 9999;
+        const bRank = b.worldRank ?? OWGR_RANKINGS[b.name] ?? 9999;
+        return aRank - bRank;
+      }
+      // Tournament leaderboard rank sort
+      const aStarted = a.r1 !== null || (a.thru !== null && a.thru !== "0");
+      const bStarted = b.r1 !== null || (b.thru !== null && b.thru !== "0");
+      if (aStarted && !bStarted) return -1;
+      if (!aStarted && bStarted) return 1;
+      if (!aStarted && !bStarted) {
+        // Both not started — sort by tee time
+        return (a.teeTime ?? "").localeCompare(b.teeTime ?? "");
+      }
+      // Both started — sort by position number (T1 → 1, T4 → 4)
+      const posA = parseInt((a.position ?? "").replace(/[^0-9]/g, "") || "999", 10);
+      const posB = parseInt((b.position ?? "").replace(/[^0-9]/g, "") || "999", 10);
+      if (posA !== posB) return posA - posB;
+      return a.totalScore - b.totalScore; // tiebreak by score
     });
 
   const scoringNote = displayRound <= 2
@@ -992,7 +1017,7 @@ function MyPicksTab({
               </div>
               {/* Sort toggle */}
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                {(["alpha", "leaderboard"] as const).map(mode => (
+                {(["alpha", "leaderboard", "world"] as const).map(mode => (
                   <button key={mode} onClick={() => setSortMode(mode)} style={{
                     padding: "6px 10px", borderRadius: 6, fontSize: 12,
                     background: sortMode === mode ? "var(--accent)" : "rgba(255,255,255,0.06)",
@@ -1000,7 +1025,7 @@ function MyPicksTab({
                     border: `1px solid ${sortMode === mode ? "var(--accent)" : "var(--card-border)"}`,
                     cursor: "pointer", fontWeight: sortMode === mode ? 600 : 400,
                   }}>
-                    {mode === "alpha" ? "A–Z" : "Rank"}
+                    {mode === "alpha" ? "A–Z" : mode === "leaderboard" ? "Rank" : "World"}
                   </button>
                 ))}
               </div>
@@ -1040,6 +1065,7 @@ function MyPicksTab({
                   espnId={gs.espnId}
                   headshot={gs.headshot}
                   usagePct={poolUsagePct(gs.name)}
+                  sortMode={sortMode}
                   onClick={() => toggle(gs.name)}
                 />
               ))}
