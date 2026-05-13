@@ -1991,9 +1991,9 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase("hold"), 600);
-    const t2 = setTimeout(() => setPhase("out"), 8000);
-    const t3 = setTimeout(() => onDone(), 8800);
+    const t1 = setTimeout(() => setPhase("hold"), 400);
+    const t2 = setTimeout(() => setPhase("out"), 4000);
+    const t3 = setTimeout(() => onDone(), 4600);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onDone]);
 
@@ -2001,22 +2001,22 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
     <div style={{
       position: "fixed", inset: 0, zIndex: 99999,
       display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center",
-      background: "#071510",
+      background: "#05080f",
       opacity: phase === "in" ? 0 : phase === "hold" ? 1 : 0,
-      transition: phase === "in" ? "opacity 600ms ease" : "opacity 800ms ease",
+      transition: phase === "in" ? "opacity 400ms ease" : "opacity 600ms ease",
       overflow: "hidden",
     }}>
       {bgImage && (
         <div style={{
           position: "absolute", inset: 0,
           backgroundImage: `url(${bgImage})`,
-          backgroundSize: "cover", backgroundPosition: "right center",
-          opacity: 0.80, filter: "none",
+          backgroundSize: "cover", backgroundPosition: "center 30%",
+          opacity: 0.55, filter: "none",
         }} />
       )}
       <div style={{
         position: "absolute", inset: 0,
-        background: "linear-gradient(135deg, rgba(7,21,16,0.92) 0%, rgba(15,35,24,0.85) 50%, rgba(7,21,16,0.92) 100%)",
+        background: "linear-gradient(135deg, rgba(5,8,15,0.88) 0%, rgba(10,16,32,0.78) 50%, rgba(5,8,15,0.88) 100%)",
       }} />
       <div style={{ position: "relative", textAlign: "center" as const, padding: "0 32px", maxWidth: 500 }}>
         <div style={{ marginBottom: 24, display: "flex", justifyContent: "center", filter: "drop-shadow(0 0 20px rgba(201,168,76,0.5))" }}><TexasIcon size={64} color="#c9a84c" /></div>
@@ -2026,18 +2026,18 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
           color: "#c9a84c", lineHeight: 1.3, marginBottom: 12,
           textShadow: "0 2px 20px rgba(201,168,76,0.3)",
         }}>
-          A Tradition Unlike Any Other
+          PGA Championship
         </div>
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
-          color: "rgba(240,233,214,0.7)", letterSpacing: "0.18em",
+          color: "rgba(232,238,248,0.7)", letterSpacing: "0.18em",
           textTransform: "uppercase" as const, marginBottom: 6,
         }}>
-          The Masters Tournament
+          Aronimink Golf Club
         </div>
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
-          color: "rgba(240,233,214,0.5)", letterSpacing: "0.22em",
+          color: "rgba(232,238,248,0.5)", letterSpacing: "0.22em",
           textTransform: "uppercase" as const, marginBottom: 40,
           textAlign: "center" as const,
         }}>
@@ -2053,30 +2053,11 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
         </div>
         <div style={{
           fontFamily: "Playfair Display, EB Garamond, serif",
-          fontSize: 20, fontWeight: 600, color: "rgba(240,233,214,0.9)",
+          fontSize: 20, fontWeight: 600, color: "rgba(232,238,248,0.9)",
           letterSpacing: "0.06em", marginBottom: 32,
         }}>
           Patterson Inc.
         </div>
-        <button
-          onClick={onUnmute}
-          style={{
-            background: muted ? "rgba(201,168,76,0.12)" : "rgba(93,186,126,0.15)",
-            border: `1px solid ${muted ? "rgba(201,168,76,0.35)" : "rgba(93,186,126,0.4)"}`,
-            borderRadius: 30, padding: "8px 20px", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 8, margin: "0 auto",
-            transition: "all 0.3s ease",
-          }}
-        >
-          <span style={{ fontSize: 16 }}>{muted ? "🔇" : "🔊"}</span>
-          <span style={{
-            fontFamily: "EB Garamond, serif", fontSize: 13,
-            color: muted ? "rgba(201,168,76,0.8)" : "rgba(93,186,126,0.9)",
-            letterSpacing: "0.08em",
-          }}>
-            {muted ? "Tap to unmute" : "Playing..."}
-          </span>
-        </button>
       </div>
     </div>
   );
@@ -2474,45 +2455,9 @@ export default function Page() {
     setToasts(q => q.filter(t => t.id !== id));
   }
   const musicRef = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize audio once
-  useEffect(() => {
-    // Try multiple sources in order
-    const sources = [
-      "/masters-theme.mp3",
-    ];
-    const audio = new Audio();
-    audio.volume = 0.35;
-    audio.loop = true;
-    // Try each source until one loads
-    let srcIndex = 0;
-    const tryNext = () => {
-      if (srcIndex >= sources.length) return;
-      audio.src = sources[srcIndex++];
-      audio.load();
-    };
-    audio.addEventListener("error", tryNext);
-    tryNext();
-    musicRef.current = audio;
-    return () => { audio.pause(); };
-  }, []);
-
-  function handleUnmute() {
-    if (!musicRef.current) return;
-    musicRef.current.play().catch(() => {});
-    setMusicMuted(false);
-  }
-
-  function handleMuteToggle() {
-    if (!musicRef.current) return;
-    if (musicMuted) {
-      musicRef.current.play().catch(() => {});
-      setMusicMuted(false);
-    } else {
-      musicRef.current.pause();
-      setMusicMuted(true);
-    }
-  }
+  // Music disabled for PGA Championship
+  function handleUnmute() {}
+  function handleMuteToggle() {}
   const tournament = getActiveTournament();
   const th = tournament.theme;
 

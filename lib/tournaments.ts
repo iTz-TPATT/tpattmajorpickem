@@ -221,18 +221,17 @@ export function getActiveTournament(): Tournament {
 
 export function getCurrentRound(t: Tournament): number {
   const now = new Date();
-  // If a round's DATE has started but its next round's DATE hasn't, we're in that round.
-  // Use the round dates (not reveal times) to determine which round is active.
+  // Before tournament starts — return 1 so picks tab shows R1
+  if (now < new Date(t.rounds[1].date + "T06:00:00-05:00")) return 1;
+  // During tournament — find which round we're in
   for (let r = 1; r <= 4; r++) {
-    const roundDate = new Date(t.rounds[r as 1|2|3|4].date + "T06:00:00-05:00"); // 6am ET tee times start
+    const roundDate = new Date(t.rounds[r as 1|2|3|4].date + "T06:00:00-05:00");
     const nextRoundDate = r < 4
       ? new Date(t.rounds[(r + 1) as 2|3|4].date + "T06:00:00-05:00")
       : new Date(t.rounds[4 as 4].date + "T23:59:59-05:00");
     if (now >= roundDate && now < nextRoundDate) return r;
   }
-  // Before tournament starts — return 1
-  if (now < new Date(t.rounds[1].date + "T06:00:00-05:00")) return 1;
-  // After tournament ends — return 4
+  // After tournament ends
   return 4;
 }
 
