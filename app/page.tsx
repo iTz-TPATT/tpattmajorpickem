@@ -1129,9 +1129,12 @@ function LeaderboardTab({
   const userMap: Record<string, string> = {};
   registeredUsers.forEach((u) => { userMap[u.id] = u.username; });
   allPicks.forEach((p) => { userMap[p.user_id] = p.username ?? userMap[p.user_id] ?? p.user_id; });
-  // If registeredUsers is empty but pickStatus has users, still show them
+  // If still a raw UUID, label it Unknown Player
   Object.keys(pickStatus).forEach(uid => {
-    if (!userMap[uid]) userMap[uid] = uid; // fallback to uid until username loads
+    if (!userMap[uid]) {
+      const isUuid = /^[0-9a-f-]{36}$/.test(uid);
+      userMap[uid] = isUuid ? "Unknown Player" : uid;
+    }
   });
 
   // Use pickStatus (from /api/pick-status) which shows all rounds regardless of reveal time
