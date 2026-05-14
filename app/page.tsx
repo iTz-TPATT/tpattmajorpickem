@@ -16,7 +16,7 @@ interface GolferScore {
   thru: string | null;
   worldRank: number | null;
 }
-type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom";
+type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom" | "chat";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function normalizeName(name: string): string {
@@ -1807,6 +1807,289 @@ const SOURCE_COLORS: Record<string, string> = {
   golfchannel: "#003087",
 };
 
+// ─── Chat Tab ─────────────────────────────────────────────────────────────────
+interface ChatMessage {
+  id: string; tournament: string; user_id: string | null; username: string;
+  avatar_slug: string | null; message: string; type: string;
+  metadata: Record<string, unknown>; created_at: string;
+}
+interface ChatReaction { id: string; message_id: string; user_id: string; username: string; emoji: string; }
+
+const CHAT_EMOJIS = ["🔥", "😂", "💀", "👏", "😤", "🐦", "😱", "🏆"];
+
+function ChatTab({ tournament, userId, username, picks, scores, currentRound, onRead }: {
+  tournament: Tournament; userId: string; username: string;
+  picks: Pick[]; scores: GolferScore[]; currentRound: number; onRead: () => void;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevScoresRef = useRef<Record<string, number | null>>({});
+  const prevR1Ref = useRef<Record<string, number | null>>({});
+  const isFirstLoad = useRef(true);
+
+  // Load messages
+  useEffect(() => {
+    onRead();
+    fetch(`/api/chat?tournament=${tournament.id}`)
+      .then(r => r.json())
+      .then(d => {
+        setMessages(d.messages ?? []);
+        setReactions(d.reactions ?? []);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      });
+  }, [tournament.id]);
+
+  // Supabase realtime subscription
+  useEffect(() => {
+    let channel: ReturnType<() => { unsubscribe: () => void }> | null = null;
+    import("@/lib/supabase").then(({ createBrowserSupabase }) => {
+      if (!createBrowserSupabase) return;
+      const sb = createBrowserSupabase();
+      channel = sb.channel("chat")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
+          const msg = payload.new as ChatMessage;
+          if (msg.tournament !== tournament.id) return;
+          setMessages(prev => [...prev, msg]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => {
+          fetch(`/api/chat?tournament=${tournament.id}`)
+            .then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+        })
+        .subscribe();
+    }).catch(() => {});
+    return () => { channel?.unsubscribe(); };
+  }, [tournament.id]);
+
+  // Auto-post score alerts for picked players
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      scores.forEach(s => {
+        const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+        prevScoresRef.current[s.name] = s[key];
+      });
+      isFirstLoad.current = false;
+      return;
+    }
+    const roundPicks = picks.filter(p => p.round_number === currentRound);
+    scores.forEach(s => {
+      const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+      const cur = s[key];
+      const prev = prevScoresRef.current[s.name] ?? null;
+      if (cur === null || prev === null || cur === prev) { prevScoresRef.current[s.name] = cur; return; }
+      const diff = cur - prev;
+      const pickers = roundPicks.filter(p => p.golfer === s.name).map(p => p.username);
+      if (!pickers.length) { prevScoresRef.current[s.name] = cur; return; }
+      const hole = s.thru && s.thru !== "F" ? ` on hole ${s.thru}` : "";
+      const pickerStr = pickers.join(", ");
+      let type = "system", msg = "", emoji = "";
+      if (diff <= -2) { type = "eagle"; emoji = "🦅"; msg = `${emoji} EAGLE! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff === -1) { type = "birdie"; emoji = "🐦"; msg = `${emoji} Birdie! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff >= 1) { type = "bogey"; emoji = "💩"; msg = `${emoji} Bogey. ${s.name}${hole} — picked by ${pickerStr}`; }
+      if (msg) {
+        fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tournament: tournament.id, username: "🏌️ Live Update", message: msg, type }) });
+      }
+      prevScoresRef.current[s.name] = cur;
+    });
+  }, [scores, picks, currentRound, tournament.id]);
+
+  async function sendMessage() {
+    if (!input.trim() || sending) return;
+    setSending(true);
+    const avatarSlug = username.toLowerCase().replace(/\s+/g, "-");
+    await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tournament: tournament.id, user_id: userId, username, avatar_slug: avatarSlug, message: input.trim(), type: "user" }),
+    });
+    setInput("");
+    setSending(false);
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === userId && r.emoji === emoji);
+    await fetch("/api/chat-reactions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_id: messageId, user_id: userId, username, emoji, action: existing ? "remove" : "add" }),
+    });
+    // Refresh reactions
+    fetch(`/api/chat?tournament=${tournament.id}`).then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+    setReactionPickerFor(null);
+  }
+
+  function getReactionGroups(messageId: string) {
+    const msgReactions = reactions.filter(r => r.message_id === messageId);
+    const groups: Record<string, { count: number; users: string[]; mine: boolean }> = {};
+    msgReactions.forEach(r => {
+      if (!groups[r.emoji]) groups[r.emoji] = { count: 0, users: [], mine: false };
+      groups[r.emoji].count++;
+      groups[r.emoji].users.push(r.username);
+      if (r.user_id === userId) groups[r.emoji].mine = true;
+    });
+    return groups;
+  }
+
+  function fmtTime(ts: string) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  }
+
+  const msgTypeStyle: Record<string, { bg: string; border: string; label: string; labelColor: string }> = {
+    birdie: { bg: "rgba(93,186,126,0.08)", border: "rgba(93,186,126,0.2)", label: "🐦 Birdie", labelColor: "#5dba7e" },
+    eagle:  { bg: "rgba(201,168,76,0.1)",  border: "rgba(201,168,76,0.3)",  label: "🦅 Eagle!",  labelColor: "#c9a84c" },
+    bogey:  { bg: "rgba(192,57,43,0.08)",  border: "rgba(192,57,43,0.2)",   label: "💩 Bogey",   labelColor: "#e07b6f" },
+    system: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", label: "📢",        labelColor: "rgba(255,255,255,0.4)" },
+    user:   { bg: "transparent", border: "transparent", label: "", labelColor: "" },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 200px)", maxWidth: 700, margin: "0 auto", padding: "0 12px" }}>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
+        {messages.length === 0 && (
+          <div style={{ textAlign: "center", padding: 40, color: "var(--cream-dim)", fontStyle: "italic" }}>
+            No messages yet. Start the conversation! ⛳
+          </div>
+        )}
+        {messages.map((msg, i) => {
+          const isUser = msg.type === "user";
+          const isMe = msg.user_id === userId;
+          const style = msgTypeStyle[msg.type] ?? msgTypeStyle.system;
+          const reactionGroups = getReactionGroups(msg.id);
+          const showDateSep = i === 0 || new Date(messages[i-1].created_at).toDateString() !== new Date(msg.created_at).toDateString();
+
+          return (
+            <div key={msg.id}>
+              {showDateSep && (
+                <div style={{ textAlign: "center", margin: "12px 0 8px", fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>
+                  {new Date(msg.created_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </div>
+              )}
+              <div style={{
+                display: "flex", flexDirection: isMe && isUser ? "row-reverse" : "row",
+                alignItems: "flex-start", gap: 8, marginBottom: 6,
+                justifyContent: isUser ? (isMe ? "flex-end" : "flex-start") : "center",
+              }}>
+                {/* Avatar — only for other users' messages */}
+                {isUser && !isMe && (
+                  <img src={`/avatars/${msg.avatar_slug}.jpg`}
+                    onError={e => { (e.target as HTMLImageElement).src = "/avatars/README.md"; (e.target as HTMLImageElement).style.display = "none"; }}
+                    style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 2 }} alt="" />
+                )}
+
+                <div style={{ maxWidth: isUser ? "72%" : "90%" }}>
+                  {/* Name + time */}
+                  {isUser && (
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 3,
+                      textAlign: isMe ? "right" : "left", letterSpacing: "0.04em" }}>
+                      {!isMe && <span style={{ color: "var(--cream-dim)", fontWeight: 600, marginRight: 6 }}>{msg.username}</span>}
+                      {fmtTime(msg.created_at)}
+                    </div>
+                  )}
+
+                  {/* Bubble */}
+                  <div
+                    onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
+                    style={{
+                      padding: isUser ? "9px 13px" : "7px 14px",
+                      borderRadius: isUser ? (isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px") : 10,
+                      background: isUser
+                        ? (isMe ? "rgba(201,168,76,0.18)" : "rgba(255,255,255,0.07)")
+                        : style.bg,
+                      border: `1px solid ${isUser ? (isMe ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.1)") : style.border}`,
+                      cursor: "pointer", fontSize: isUser ? 14 : 13,
+                      color: isUser ? "var(--cream)" : "var(--cream-dim)",
+                      fontFamily: isUser ? "inherit" : "monospace",
+                      textAlign: isUser ? "left" : "center",
+                      lineHeight: 1.45,
+                    }}>
+                    {!isUser && style.label && (
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: style.labelColor, marginBottom: 3 }}>{style.label}</div>
+                    )}
+                    {msg.message}
+                  </div>
+
+                  {/* Reaction picker */}
+                  {reactionPickerFor === msg.id && (
+                    <div style={{
+                      display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4,
+                      background: "rgba(20,20,30,0.95)", border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 20, padding: "6px 10px",
+                      justifyContent: isMe ? "flex-end" : "flex-start",
+                    }}>
+                      {CHAT_EMOJIS.map(e => (
+                        <button key={e} onClick={() => toggleReaction(msg.id, e)}
+                          style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", padding: "2px 4px", borderRadius: 6,
+                            opacity: reactions.find(r => r.message_id === msg.id && r.user_id === userId && r.emoji === e) ? 1 : 0.6 }}>
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Existing reactions */}
+                  {Object.keys(reactionGroups).length > 0 && (
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                      {Object.entries(reactionGroups).map(([emoji, data]) => (
+                        <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
+                          title={data.users.join(", ")}
+                          style={{
+                            fontSize: 12, padding: "2px 7px", borderRadius: 12, cursor: "pointer",
+                            background: data.mine ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.06)",
+                            border: `1px solid ${data.mine ? "rgba(201,168,76,0.35)" : "rgba(255,255,255,0.1)"}`,
+                            color: "var(--cream-dim)", display: "flex", alignItems: "center", gap: 4,
+                          }}>
+                          {emoji} <span style={{ fontSize: 11 }}>{data.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{
+        borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12, paddingBottom: 16,
+        display: "flex", gap: 10, alignItems: "flex-end",
+      }}>
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+          placeholder="Message the pool… (Enter to send)"
+          maxLength={280}
+          rows={1}
+          style={{
+            flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 20, padding: "10px 16px", color: "var(--cream)", fontSize: 14,
+            resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4,
+            maxHeight: 100, overflowY: "auto",
+          }}
+        />
+        <button onClick={sendMessage} disabled={!input.trim() || sending}
+          style={{
+            background: input.trim() ? "var(--accent)" : "rgba(255,255,255,0.08)",
+            border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() ? "pointer" : "not-allowed",
+            fontSize: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "background 0.2s",
+          }}>
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NewsroomTab() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2513,6 +2796,7 @@ export default function Page() {
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const [pickStatus, setPickStatus] = useState<Record<string, number[]>>({});
+  const [chatUnread, setChatUnread] = useState(0);
   const [showSplash, setShowSplash] = useState(false);
   const [splashDone, setSplashDone] = useState(() => typeof window !== "undefined" && !!sessionStorage.getItem("mp_splash_shown"));
   const [musicMuted, setMusicMuted] = useState(true);
@@ -2620,6 +2904,21 @@ export default function Page() {
       }
       setAdminOverrides(overridesData ?? {});
       setPickStatus(pickStatusData.status ?? {});
+
+      // Increment chat unread if not on chat tab
+      if (tab !== "chat") {
+        try {
+          const chatRes = await fetch(`/api/chat?tournament=${tid}`);
+          if (chatRes.ok) {
+            const chatData = await chatRes.json();
+            const lastSeen = parseInt(sessionStorage.getItem("chat_last_seen") ?? "0", 10);
+            const newCount = (chatData.messages ?? []).filter((m: {created_at: string}) =>
+              new Date(m.created_at).getTime() > lastSeen
+            ).length;
+            if (newCount > 0) setChatUnread(n => n + newCount);
+          }
+        } catch { /* ignore */ }
+      }
 
       // ── Notification detection (skip on first fetch — no "prev" to compare) ──
       if (!isFirstFetch.current && newScores.length > 0) {
@@ -2854,7 +3153,7 @@ export default function Page() {
 
       {/* Tab nav */}
       <div className="tab-nav" style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
-        {(["picks", "leaderboard", "tournament", "history", "course", "newsroom"] as Tab[]).map((t) => (
+        {(["picks", "leaderboard", "tournament", "history", "course", "newsroom", "chat"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "13px 18px", fontSize: 14, background: "transparent", border: "none",
             borderBottom: tab === t ? `2px solid ${th.accent}` : "2px solid transparent",
@@ -2867,7 +3166,19 @@ export default function Page() {
               : t === "tournament" ? "⛳ Tournament"
               : t === "history" ? "📜 History"
               : t === "course" ? "🔍 Course Guide"
-              : "📡 Newsroom"}
+              : t === "newsroom" ? "📡 Newsroom"
+              : <span style={{ position: "relative" }}>
+                  💬 Chat
+                  {chatUnread > 0 && tab !== "chat" && (
+                    <span style={{
+                      position: "absolute", top: -6, right: -10,
+                      background: "#c0392b", color: "#fff",
+                      fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+                      borderRadius: 8, padding: "1px 5px", minWidth: 16, textAlign: "center",
+                    }}>{chatUnread > 99 ? "99+" : chatUnread}</span>
+                  )}
+                </span>
+            }
           </button>
         ))}
       </div>
@@ -2897,6 +3208,17 @@ export default function Page() {
         )}
         {tab === "newsroom" && (
           <NewsroomTab />
+        )}
+        {tab === "chat" && (
+          <ChatTab
+            tournament={tournament}
+            userId={userId ?? ""}
+            username={username ?? ""}
+            picks={picks}
+            scores={scores}
+            currentRound={computedRound}
+            onRead={() => setChatUnread(0)}
+          />
         )}
       </main>
     </div>
