@@ -1616,7 +1616,7 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
 
 
 // ─── Tournament Leaderboard Tab ───────────────────────────────────────────────
-function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
+function TournamentLeaderboardTab({ scores, tournament }: { scores: GolferScore[]; tournament: Tournament }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   function fmtScore(s: number | null) {
@@ -1663,8 +1663,8 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
     <div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 4 }}>Live</div>
-        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)" }}>Masters Leaderboard</div>
-        <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 4 }}>Augusta National · {active.length} players · Updated every 2 min</div>
+        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)" }}>{tournament.name} Leaderboard</div>
+        <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 4 }}>{tournament.location} · {active.length} players · Updated every 2 min</div>
       </div>
 
       {/* Header */}
@@ -3153,7 +3153,7 @@ export default function Page() {
 
       {/* Tab nav */}
       <div className="tab-nav" style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
-        {(["picks", "leaderboard", "tournament", "history", "course", "newsroom", "chat"] as Tab[]).map((t) => (
+        {(["picks", "leaderboard", "chat", "tournament", "history", "course", "newsroom"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "13px 18px", fontSize: 14, background: "transparent", border: "none",
             borderBottom: tab === t ? `2px solid ${th.accent}` : "2px solid transparent",
@@ -3198,7 +3198,7 @@ export default function Page() {
           <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={computedRound} pickStatus={pickStatus} />
         )}
         {tab === "tournament" && (
-          <TournamentLeaderboardTab scores={scores} />
+          <TournamentLeaderboardTab scores={scores} tournament={tournament} />
         )}
         {tab === "history" && (
           <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />
