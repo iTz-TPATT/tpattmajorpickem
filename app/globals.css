@@ -143,3 +143,20 @@ img { max-width: 100%; height: auto; }
   0%   { opacity: 0; transform: translateY(-16px) scale(0.95); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ── Leaderboard split layout ────────────────────────────────── */
+@media (min-width: 900px) {
+  .leaderboard-split {
+    flex-direction: row !important;
+  }
+  .leaderboard-main {
+    flex: 0 0 65% !important;
+    width: 65% !important;
+  }
+  .leaderboard-feed {
+    flex: 0 0 calc(35% - 16px) !important;
+    width: calc(35% - 16px) !important;
+    position: sticky;
+    top: 80px;
+  }
+}

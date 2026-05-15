@@ -16,7 +16,7 @@ interface GolferScore {
   thru: string | null;
   worldRank: number | null;
 }
-type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom" | "chat";
+type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function normalizeName(name: string): string {
@@ -1175,12 +1175,230 @@ function MyPicksTab({
 }
 
 // ─── Leaderboard Tab ──────────────────────────────────────────────────────────
+// ─── Live Feed Panel ──────────────────────────────────────────────────────────
+const FEED_EMOJIS = ["🔥", "😂", "💀", "👏", "😤", "🐦", "😱", "🏆"];
+
+function LiveFeedPanel({ tournament, allPicks, scores, currentRound, userId, username }: {
+  tournament: Tournament; allPicks: Pick[]; scores: GolferScore[];
+  currentRound: number; userId: string; username: string;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevScoresRef = useRef<Record<string, number | null>>({});
+  const isFirstLoad = useRef(true);
+
+  useEffect(() => {
+    fetch(`/api/chat?tournament=${tournament.id}`)
+      .then(r => r.json())
+      .then(d => {
+        setMessages(d.messages ?? []);
+        setReactions(d.reactions ?? []);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      });
+  }, [tournament.id]);
+
+  // Realtime subscription
+  useEffect(() => {
+    let channel: ReturnType<() => { unsubscribe: () => void }> | null = null;
+    import("@/lib/supabase").then(({ createBrowserSupabase }) => {
+      if (!createBrowserSupabase) return;
+      const sb = createBrowserSupabase();
+      channel = sb.channel("livefeed")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
+          const msg = payload.new as ChatMessage;
+          if (msg.tournament !== tournament.id) return;
+          setMessages(prev => [...prev, msg]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => {
+          fetch(`/api/chat?tournament=${tournament.id}`).then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+        })
+        .subscribe();
+    }).catch(() => {});
+    return () => { channel?.unsubscribe(); };
+  }, [tournament.id]);
+
+  // Score alerts for all picked players
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      scores.forEach(s => {
+        const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+        prevScoresRef.current[s.name] = s[key];
+      });
+      isFirstLoad.current = false;
+      return;
+    }
+    const roundPicks = allPicks.filter(p => p.round_number === currentRound);
+    scores.forEach(s => {
+      const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+      const cur = s[key];
+      const prev = prevScoresRef.current[s.name] ?? null;
+      if (cur === null || prev === null || cur === prev) { prevScoresRef.current[s.name] = cur; return; }
+      const diff = cur - prev;
+      const pickers = roundPicks.filter(p => p.golfer === s.name).map(p => p.username);
+      if (!pickers.length) { prevScoresRef.current[s.name] = cur; return; }
+      const hole = s.thru && s.thru !== "F" ? ` on hole ${s.thru}` : "";
+      const pickerStr = pickers.join(", ");
+      let type = "system", msg = "";
+      if (diff <= -2)      { type = "eagle";  msg = `🦅 EAGLE! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff === -1) { type = "birdie"; msg = `🐦 Birdie! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff === 1)  { type = "bogey";  msg = `💩 Bogey. ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff >= 2)   { type = "bogey";  msg = `☠️ Double bogey. ${s.name}${hole} — picked by ${pickerStr}`; }
+      if (msg) {
+        fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tournament: tournament.id, username: "🏌️ Live", message: msg, type }) });
+      }
+      prevScoresRef.current[s.name] = cur;
+    });
+  }, [scores, allPicks, currentRound, tournament.id]);
+
+  async function sendMessage() {
+    if (!input.trim() || sending) return;
+    setSending(true);
+    const avatarSlug = username.toLowerCase().replace(/\s+/g, "-");
+    await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tournament: tournament.id, user_id: userId, username, avatar_slug: avatarSlug, message: input.trim(), type: "user" }),
+    });
+    setInput(""); setSending(false);
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === userId && r.emoji === emoji);
+    await fetch("/api/chat-reactions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_id: messageId, user_id: userId, username, emoji, action: existing ? "remove" : "add" }),
+    });
+    fetch(`/api/chat?tournament=${tournament.id}`).then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+    setReactionPickerFor(null);
+  }
+
+  function getReactionGroups(messageId: string) {
+    const msgReactions = reactions.filter(r => r.message_id === messageId);
+    const groups: Record<string, { count: number; users: string[]; mine: boolean }> = {};
+    msgReactions.forEach(r => {
+      if (!groups[r.emoji]) groups[r.emoji] = { count: 0, users: [], mine: false };
+      groups[r.emoji].count++;
+      groups[r.emoji].users.push(r.username);
+      if (r.user_id === userId) groups[r.emoji].mine = true;
+    });
+    return groups;
+  }
+
+  const typeStyle: Record<string, { bg: string; border: string; color: string }> = {
+    birdie: { bg: "rgba(93,186,126,0.08)",  border: "rgba(93,186,126,0.2)",  color: "#5dba7e" },
+    eagle:  { bg: "rgba(201,168,76,0.12)",  border: "rgba(201,168,76,0.3)",  color: "#c9a84c" },
+    bogey:  { bg: "rgba(192,57,43,0.08)",   border: "rgba(192,57,43,0.2)",   color: "#e07b6f" },
+    system: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" },
+    user:   { bg: "transparent",            border: "transparent",            color: "" },
+  };
+
+  return (
+    <div style={{
+      background: "var(--card-bg)", border: "1px solid var(--card-border)",
+      borderRadius: 10, display: "flex", flexDirection: "column", height: 600,
+    }}>
+      {/* Header */}
+      <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--card-border)", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 14 }}>💬</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)", letterSpacing: "0.06em" }}>LIVE FEED</span>
+        <span style={{ fontSize: 11, color: "var(--cream-dim)", marginLeft: "auto" }}>Picks · Scores · Chat</span>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+        {messages.length === 0 && (
+          <div style={{ textAlign: "center", padding: 24, color: "var(--cream-dim)", fontSize: 13, fontStyle: "italic" }}>
+            Live score updates and chat will appear here ⛳
+          </div>
+        )}
+        {messages.map((msg) => {
+          const isUser = msg.type === "user";
+          const isMe = msg.user_id === userId;
+          const st = typeStyle[msg.type] ?? typeStyle.system;
+          const rg = getReactionGroups(msg.id);
+
+          return (
+            <div key={msg.id} style={{ marginBottom: 6 }}>
+              {isUser ? (
+                <div style={{ display: "flex", flexDirection: isMe ? "row-reverse" : "row", gap: 6, alignItems: "flex-end" }}>
+                  <div style={{ maxWidth: "80%" }}>
+                    {!isMe && <div style={{ fontSize: 10, color: "var(--cream-dim)", marginBottom: 2 }}>{msg.username}</div>}
+                    <div onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
+                      style={{
+                        padding: "7px 11px", borderRadius: isMe ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+                        background: isMe ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.07)",
+                        border: `1px solid ${isMe ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.1)"}`,
+                        fontSize: 13, color: "var(--cream)", cursor: "pointer", lineHeight: 1.4,
+                      }}>{msg.message}</div>
+                  </div>
+                </div>
+              ) : (
+                <div onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
+                  style={{
+                    padding: "6px 10px", borderRadius: 8, cursor: "pointer",
+                    background: st.bg, border: `1px solid ${st.border}`,
+                    fontSize: 12, color: st.color, textAlign: "center" as const, lineHeight: 1.4,
+                  }}>{msg.message}</div>
+              )}
+
+              {reactionPickerFor === msg.id && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: isMe ? "flex-end" : "flex-start",
+                  background: "rgba(20,20,30,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "4px 8px", marginTop: 2 }}>
+                  {FEED_EMOJIS.map(e => (
+                    <button key={e} onClick={() => toggleReaction(msg.id, e)}
+                      style={{ fontSize: 16, background: "none", border: "none", cursor: "pointer", padding: "1px 3px" }}>{e}</button>
+                  ))}
+                </div>
+              )}
+
+              {Object.keys(rg).length > 0 && (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 2, justifyContent: isMe && isUser ? "flex-end" : "flex-start" }}>
+                  {Object.entries(rg).map(([emoji, data]) => (
+                    <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)} title={data.users.join(", ")}
+                      style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, cursor: "pointer",
+                        background: data.mine ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.06)",
+                        border: `1px solid ${data.mine ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.1)"}`,
+                        color: "var(--cream-dim)" }}>
+                      {emoji} {data.count}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: "8px 12px", borderTop: "1px solid var(--card-border)", display: "flex", gap: 8, alignItems: "center" }}>
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } }}
+          placeholder="Message the pool…" maxLength={280}
+          style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 16, padding: "7px 12px", color: "var(--cream)", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+        <button onClick={sendMessage} disabled={!input.trim() || sending}
+          style={{ background: input.trim() ? "var(--accent)" : "rgba(255,255,255,0.08)", border: "none",
+            borderRadius: "50%", width: 34, height: 34, cursor: input.trim() ? "pointer" : "default",
+            fontSize: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>➤</button>
+      </div>
+    </div>
+  );
+}
+
 function LeaderboardTab({
   tournament, allPicks, scores, playerCount, registeredUsers, currentRound, pickStatus,
+  userId, username,
 }: {
   tournament: Tournament; allPicks: Pick[]; scores: GolferScore[];
   playerCount: number; registeredUsers: {id: string; username: string}[];
   currentRound: number; pickStatus: Record<string, number[]>;
+  userId: string; username: string;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [hideNoPicks, setHideNoPicks] = useState(false);
@@ -1286,7 +1504,7 @@ function LeaderboardTab({
     ? standings.filter(u => Object.keys(u.rounds).length > 0)
     : standings;
 
-  return (
+  const leaderboardContent = (
     <div style={{ fontFamily: "'EB Garamond', serif" }}>
       {/* Masters-style header bar */}
       <div style={{
@@ -1560,6 +1778,30 @@ function LeaderboardTab({
           ⚖️ Tied — purse splits equally
         </p>
       )}
+    </div>
+  );
+
+  return (
+    <div style={{
+      display: "flex", gap: 16, alignItems: "flex-start",
+      flexDirection: "column" as const,
+    }}
+      className="leaderboard-split">
+      {/* Leaderboard — 65% on desktop */}
+      <div style={{ flex: "0 0 100%", width: "100%" }} className="leaderboard-main">
+        {leaderboardContent}
+      </div>
+      {/* Live Feed — 35% on desktop */}
+      <div style={{ flex: "0 0 100%", width: "100%" }} className="leaderboard-feed">
+        <LiveFeedPanel
+          tournament={tournament}
+          allPicks={allPicks}
+          scores={scores}
+          currentRound={currentRound}
+          userId={userId}
+          username={username}
+        />
+      </div>
     </div>
   );
 }
@@ -2832,7 +3074,6 @@ export default function Page() {
   const [odds, setOdds] = useState<Record<string, string>>({});
   const [playerCount, setPlayerCount] = useState(0);
   const [pickStatus, setPickStatus] = useState<Record<string, number[]>>({});
-  const [chatUnread, setChatUnread] = useState(0);
   const [showSplash, setShowSplash] = useState(false);
   const [splashDone, setSplashDone] = useState(() => typeof window !== "undefined" && !!sessionStorage.getItem("mp_splash_shown"));
   const [musicMuted, setMusicMuted] = useState(true);
@@ -2950,21 +3191,6 @@ export default function Page() {
       }
       setAdminOverrides(overridesData ?? {});
       setPickStatus(pickStatusData.status ?? {});
-
-      // Increment chat unread if not on chat tab
-      if (tab !== "chat") {
-        try {
-          const chatRes = await fetch(`/api/chat?tournament=${tid}`);
-          if (chatRes.ok) {
-            const chatData = await chatRes.json();
-            const lastSeen = parseInt(sessionStorage.getItem("chat_last_seen") ?? "0", 10);
-            const newCount = (chatData.messages ?? []).filter((m: {created_at: string}) =>
-              new Date(m.created_at).getTime() > lastSeen
-            ).length;
-            if (newCount > 0) setChatUnread(n => n + newCount);
-          }
-        } catch { /* ignore */ }
-      }
 
       // ── Notification detection (skip on first fetch — no "prev" to compare) ──
       if (!isFirstFetch.current && newScores.length > 0) {
@@ -3199,7 +3425,7 @@ export default function Page() {
 
       {/* Tab nav */}
       <div className="tab-nav" style={{ background: th.bgDark, borderBottom: `1px solid ${th.cardBorder}`, display: "flex", position: "sticky", top: 73, zIndex: 40 }}>
-        {(["picks", "leaderboard", "chat", "tournament", "history", "course", "newsroom"] as Tab[]).map((t) => (
+        {(["picks", "leaderboard", "tournament", "history", "course", "newsroom"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "13px 18px", fontSize: 14, background: "transparent", border: "none",
             borderBottom: tab === t ? `2px solid ${th.accent}` : "2px solid transparent",
@@ -3208,23 +3434,11 @@ export default function Page() {
             fontWeight: tab === t ? 600 : 400, transition: "all 0.2s", whiteSpace: "nowrap" as const,
           }}>
             {t === "picks" ? "🎯 My Picks"
-              : t === "leaderboard" ? "🪙 Pick'em Leaderboard"
+              : t === "leaderboard" ? "🪙 Leaderboard 💬"
               : t === "tournament" ? "⛳ Tournament"
               : t === "history" ? "📜 History"
               : t === "course" ? "🔍 Course Guide"
-              : t === "newsroom" ? "📡 Newsroom"
-              : <span style={{ position: "relative" }}>
-                  💬 Chat
-                  {chatUnread > 0 && tab !== "chat" && (
-                    <span style={{
-                      position: "absolute", top: -6, right: -10,
-                      background: "#c0392b", color: "#fff",
-                      fontSize: 9, fontFamily: "monospace", fontWeight: 700,
-                      borderRadius: 8, padding: "1px 5px", minWidth: 16, textAlign: "center",
-                    }}>{chatUnread > 99 ? "99+" : chatUnread}</span>
-                  )}
-                </span>
-            }
+              : "📡 Newsroom"}
           </button>
         ))}
       </div>
@@ -3241,7 +3455,7 @@ export default function Page() {
           <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={computedRound} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={computedRound} pickStatus={pickStatus} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={computedRound} pickStatus={pickStatus} userId={userId ?? ""} username={username ?? ""} />
         )}
         {tab === "tournament" && (
           <TournamentLeaderboardTab scores={scores} tournament={tournament} />
@@ -3254,17 +3468,6 @@ export default function Page() {
         )}
         {tab === "newsroom" && (
           <NewsroomTab />
-        )}
-        {tab === "chat" && (
-          <ChatTab
-            tournament={tournament}
-            userId={userId ?? ""}
-            username={username ?? ""}
-            picks={picks}
-            scores={scores}
-            currentRound={computedRound}
-            onRead={() => setChatUnread(0)}
-          />
         )}
       </main>
     </div>
