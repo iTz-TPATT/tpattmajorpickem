@@ -975,12 +975,40 @@ function MyPicksTab({
           )}
         </div>
 
-        {/* Selected picks summary */}
+        {/* Selected picks summary + top action buttons */}
         {selected.length > 0 && (
           <div style={{ marginBottom: 12 }}>
-            <p style={{ fontSize: 11, color: "var(--cream-dim)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-              {revealed ? "Your picks" : `Selected (${selected.length}/3)`}
-            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <p style={{ fontSize: 11, color: "var(--cream-dim)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
+                {revealed ? "Your picks" : `Selected (${selected.length}/3)`}
+              </p>
+              {!revealed && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => { setSelected([]); setSaved(false); setSuccess(""); setError(""); }}
+                    style={{
+                      fontSize: 12, padding: "4px 10px", borderRadius: 6,
+                      background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                      color: "var(--cream-dim)", cursor: "pointer",
+                    }}>
+                    ✕ Clear
+                  </button>
+                  <button
+                    onClick={submit}
+                    disabled={selected.length !== 3 || submitting}
+                    style={{
+                      fontSize: 12, padding: "4px 12px", borderRadius: 6,
+                      background: selected.length === 3 ? "var(--accent)" : "rgba(255,255,255,0.06)",
+                      border: `1px solid ${selected.length === 3 ? "var(--accent)" : "var(--card-border)"}`,
+                      color: selected.length === 3 ? "var(--bg)" : "var(--cream-dim)",
+                      cursor: selected.length !== 3 || submitting ? "not-allowed" : "pointer",
+                      fontWeight: 600, opacity: selected.length !== 3 || submitting ? 0.5 : 1,
+                    }}>
+                    {submitting ? "Saving…" : saved ? "✓ Update" : "🔒 Save"}
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {selected.map((g) => {
                 const sc = scoreMap[g];
