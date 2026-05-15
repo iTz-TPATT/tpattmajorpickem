@@ -85,20 +85,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cannot pick the same golfer twice" }, { status: 400 });
   }
 
-  // Delete existing picks for this round first
+  // Delete then insert — use upsert to avoid duplicate key errors
   const { error: deleteError } = await supabase.from("picks").delete()
     .eq("user_id", user.userId).eq("tournament", tid).eq("round_number", round);
 
   if (deleteError) {
     console.error("Delete picks error:", deleteError);
-    return NextResponse.json({ error: "Failed to clear previous picks — try again" }, { status: 500 });
+    // Don't fail — try to upsert anyway
   }
 
-  const { error: insertError } = await supabase.from("picks").insert(
+  const { error: insertError } = await supabase.from("picks").upsert(
     golfers.map((golfer) => ({
       user_id: user.userId, username: user.username,
       tournament: tid, round_number: round, golfer,
-    }))
+    })),
+    { onConflict: "user_id,tournament,round_number,golfer" }
   );
 
   if (insertError) {
