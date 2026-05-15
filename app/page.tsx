@@ -899,9 +899,17 @@ function MyPicksTab({
         body: JSON.stringify({ tournament: tournament.id, round: displayRound, golfers: selected }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
-      setSaved(true); setSuccess("Picks saved!"); onPicksChanged();
-    } catch { setError("Network error"); }
+      if (!res.ok) {
+        // Token expired — prompt re-login
+        if (res.status === 401) {
+          setError("Session expired — please log out and log back in");
+        } else {
+          setError(data.error ?? "Failed to save picks — please try again");
+        }
+        return;
+      }
+      setSaved(true); setSuccess("Picks saved! ✓"); onPicksChanged();
+    } catch { setError("Network error — check your connection and try again"); }
     finally { setSubmitting(false); }
   }
 
@@ -2842,7 +2850,17 @@ export default function Page() {
     const id = localStorage.getItem("mp_userId");
     if (t && u && id) {
       setToken(t); setUsername(u); setUserId(id);
-      // Show splash once per session even if already logged in
+      // Silently refresh token on every app load — keeps it valid for another 30 days
+      // This means users who open the app regularly will never see an expired token
+      fetch("/api/refresh", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${t}` },
+      }).then(r => r.ok ? r.json() : null).then(data => {
+        if (data?.token) {
+          localStorage.setItem("mp_token", data.token);
+          setToken(data.token);
+        }
+      }).catch(() => {}); // silent — don't disrupt app load if refresh fails
       if (!sessionStorage.getItem("mp_splash_shown")) {
         setShowSplash(true);
       }
