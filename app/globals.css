@@ -148,15 +148,24 @@ img { max-width: 100%; height: auto; }
 @media (min-width: 900px) {
   .leaderboard-split {
     flex-direction: row !important;
+    align-items: flex-start;
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
   }
   .leaderboard-main {
-    flex: 0 0 65% !important;
-    width: 65% !important;
+    flex: 0 0 68% !important;
+    width: 68% !important;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .leaderboard-feed {
-    flex: 0 0 calc(35% - 16px) !important;
-    width: calc(35% - 16px) !important;
+    flex: 0 0 calc(32% - 16px) !important;
+    width: calc(32% - 16px) !important;
+    min-width: 0;
+    max-width: 360px;
     position: sticky;
     top: 80px;
+    box-sizing: border-box;
   }
 }

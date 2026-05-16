@@ -34,6 +34,7 @@ export async function GET(request: Request) {
 
   const filtered = (picks ?? []).filter((p) => {
     if (p.user_id === user.userId) return true;
+    // Admin reveal override — show all picks regardless of time
     if (overrides.revealAll) return true;
     return isRoundRevealed(tournament, p.round_number);
   });
@@ -58,11 +59,13 @@ export async function POST(request: Request) {
   const supabase = createServerSupabase();
   const overrides = await getAdminOverrides(supabase);
 
+  // Only block if deadline passed AND admin hasn't set skipDeadline
   const deadlinePassed = !overrides.skipDeadline && isRoundRevealed(tournament, round);
   if (deadlinePassed) {
-    return NextResponse.json({ error: "Pick deadline has passed for this round" }, { status: 400 });
+    return NextResponse.json({ error: "Pick deadline has passed for this round — tee times have started" }, { status: 400 });
   }
 
+  // Check burned golfers
   if (round > 1) {
     const { data: prev } = await supabase
       .from("picks")
@@ -82,6 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cannot pick the same golfer twice" }, { status: 400 });
   }
 
+  // Delete existing picks then insert fresh
   await supabase.from("picks").delete()
     .eq("user_id", user.userId).eq("tournament", tid).eq("round_number", round);
 
@@ -93,6 +97,7 @@ export async function POST(request: Request) {
   );
 
   if (insertError) {
+    console.error("Insert picks error:", insertError.message, insertError.details, insertError.hint);
     return NextResponse.json({ error: `Failed to save picks: ${insertError.message}` }, { status: 500 });
   }
   return NextResponse.json({ success: true });

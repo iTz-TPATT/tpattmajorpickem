@@ -3450,7 +3450,7 @@ export default function Page() {
       <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} tournament={tournament} />
 
       {/* Content */}
-      <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 12px" }}>
         {tab === "picks" && token && userId && (
           <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={computedRound} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
         )}
