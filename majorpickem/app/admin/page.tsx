@@ -139,7 +139,7 @@ export default function AdminPage() {
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"ok" | "err">("ok");
   const [saving, setSaving] = useState(false);
-  const [selectedTournament] = useState("masters");
+  const [selectedTournament] = useState("usopen");
   const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
   const [proxyUser, setProxyUser] = useState("");
   const [proxyRound, setProxyRound] = useState(1);

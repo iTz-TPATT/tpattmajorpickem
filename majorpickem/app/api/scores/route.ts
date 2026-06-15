@@ -8,7 +8,7 @@ export interface GolferScore {
   name: string; espnId: string; headshot: string | null;
   totalScore: number; position: string; status: string;
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
-  teeTime: string | null; thru: string | null;
+  teeTime: string | null; thru: string | null; worldRank: number | null;
 }
 
 const PAR = 72; // Masters par
@@ -92,6 +92,9 @@ function parseESPN(data: unknown): GolferScore[] {
       const name = (athlete.displayName as string) ?? "";
       if (!name) continue;
 
+      const rankRaw = (athlete.ranking ?? comp.ranking) as unknown;
+      const worldRank = rankRaw != null ? parseInt(String(rankRaw), 10) || null : null;
+
       players.push({
         name,
         espnId: String(athlete.id ?? ""),
@@ -103,6 +106,7 @@ function parseESPN(data: unknown): GolferScore[] {
         r1: rounds[0], r2: rounds[1], r3: rounds[2], r4: rounds[3],
         teeTime,
         thru: thru != null ? String(thru) : null,
+        worldRank,
       });
     }
   } catch (e) {
@@ -115,8 +119,8 @@ async function fetchFromESPN(): Promise<GolferScore[]> {
   // Try specific Masters 2026 event ID first (returns full 91-player field)
   // Fall back to generic PGA endpoint
   const urls = [
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga", // generic — always returns current live event
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401580365", // PGA Championship 2026 Aronimink
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=usopen", // US Open — USGA event, separate from PGA Tour
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401580366", // US Open 2026 Shinnecock Hills fallback
     "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
   ];
   for (const url of urls) {
@@ -173,12 +177,25 @@ export async function GET(request: Request) {
   // If tournament is over, always serve final cached scores — never hit ESPN again
   const TOURNAMENT_END_DATES: Record<string, string> = {
     masters: "2026-04-12T23:59:59Z",
-    pga:     "2026-05-24T23:59:59Z",
+    pga:     "2026-05-17T23:59:59Z",
     usopen:  "2026-06-21T23:59:59Z",
     theopen: "2026-07-19T23:59:59Z",
   };
+  const TOURNAMENT_START_DATES: Record<string, string> = {
+    masters: "2026-04-09T00:00:00Z",
+    pga:     "2026-05-14T00:00:00Z",
+    usopen:  "2026-06-18T00:00:00Z",
+    theopen: "2026-07-16T00:00:00Z",
+  };
   const endDate = TOURNAMENT_END_DATES[tournament];
+  const startDate = TOURNAMENT_START_DATES[tournament];
   const tournamentOver = endDate ? new Date() > new Date(endDate) : false;
+  const tournamentStarted = startDate ? new Date() >= new Date(startDate) : true;
+
+  // Before tournament starts — don't serve any cached scores (could be stale from another event)
+  if (!tournamentStarted) {
+    return NextResponse.json({ scores: [], source: "pre_tournament" });
+  }
 
   if (tournamentOver && cachedScores.length > 0) {
     if (debug) return NextResponse.json({ scores: cachedScores, source: "final_cache", count: cachedScores.length });

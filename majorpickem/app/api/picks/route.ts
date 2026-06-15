@@ -59,17 +59,10 @@ export async function POST(request: Request) {
   const supabase = createServerSupabase();
   const overrides = await getAdminOverrides(supabase);
 
-  // Allow picking for any round whose deadline hasn't passed yet.
-  // This means: during R1, players can already submit R2 picks.
-  // Admin skipDeadline override bypasses all deadline checks.
+  // Only block if deadline passed AND admin hasn't set skipDeadline
   const deadlinePassed = !overrides.skipDeadline && isRoundRevealed(tournament, round);
   if (deadlinePassed) {
-    return NextResponse.json({ error: "Pick deadline has passed for this round" }, { status: 400 });
-  }
-
-  // If admin has set a round override, only allow that specific round
-  if (overrides.roundOverride && round !== (overrides.roundOverride as number)) {
-    return NextResponse.json({ error: `Admin has locked picks to Round ${overrides.roundOverride}` }, { status: 400 });
+    return NextResponse.json({ error: "Pick deadline has passed for this round — tee times have started" }, { status: 400 });
   }
 
   // Check burned golfers
@@ -92,16 +85,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cannot pick the same golfer twice" }, { status: 400 });
   }
 
+  // Delete existing picks then insert fresh
   await supabase.from("picks").delete()
     .eq("user_id", user.userId).eq("tournament", tid).eq("round_number", round);
 
-  const { error } = await supabase.from("picks").insert(
+  const { error: insertError } = await supabase.from("picks").insert(
     golfers.map((golfer) => ({
       user_id: user.userId, username: user.username,
       tournament: tid, round_number: round, golfer,
     }))
   );
 
-  if (error) return NextResponse.json({ error: "Failed to save picks" }, { status: 500 });
+  if (insertError) {
+    console.error("Insert picks error:", insertError.message, insertError.details, insertError.hint);
+    return NextResponse.json({ error: `Failed to save picks: ${insertError.message}` }, { status: 500 });
+  }
   return NextResponse.json({ success: true });
 }

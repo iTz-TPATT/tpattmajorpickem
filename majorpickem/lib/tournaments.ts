@@ -88,12 +88,12 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
     id: "pga", name: "PGA Championship", shortName: "PGA Championship",
     location: "Aronimink Golf Club · Newtown Square, PA", year: 2026,
     rounds: {
-      1: { date: "2026-05-21", revealTimeUTC: "2026-05-21T12:00:00Z" },
-      2: { date: "2026-05-22", revealTimeUTC: "2026-05-22T12:00:00Z" },
-      3: { date: "2026-05-23", revealTimeUTC: "2026-05-23T11:00:00Z" },
-      4: { date: "2026-05-24", revealTimeUTC: "2026-05-24T11:00:00Z" },
+      1: { date: "2026-05-14", revealTimeUTC: "2026-05-14T13:00:00Z" },
+      2: { date: "2026-05-15", revealTimeUTC: "2026-05-15T13:00:00Z" },
+      3: { date: "2026-05-16", revealTimeUTC: "2026-05-16T13:00:00Z" },
+      4: { date: "2026-05-17", revealTimeUTC: "2026-05-17T13:00:00Z" },
     },
-    priorChampion: { name: "Trenton Patterson", year: 2026 },
+    priorChampion: { name: "Wyatt T.O. Robson", year: 2025 },
     theme: {
       bg: "#05080f", bgDark: "#0a1020", bgMid: "#112040",
       accent: "#c9a84c", accentLight: "#e2c97e",
@@ -132,26 +132,31 @@ export const TOURNAMENTS: Record<TournamentId, Tournament> = {
   },
   usopen: {
     id: "usopen", name: "U.S. Open Championship", shortName: "U.S. Open",
-    location: "Oakmont Country Club · Oakmont, PA", year: 2026,
+    location: "Shinnecock Hills Golf Club · Southampton, NY", year: 2026,
     rounds: {
-      1: { date: "2026-06-18", revealTimeUTC: "2026-06-18T12:00:00Z" },
-      2: { date: "2026-06-19", revealTimeUTC: "2026-06-19T12:00:00Z" },
-      3: { date: "2026-06-20", revealTimeUTC: "2026-06-20T13:30:00Z" },
-      4: { date: "2026-06-21", revealTimeUTC: "2026-06-21T13:30:00Z" },
+      1: { date: "2026-06-18", revealTimeUTC: "2026-06-18T13:00:00Z" },
+      2: { date: "2026-06-19", revealTimeUTC: "2026-06-19T13:00:00Z" },
+      3: { date: "2026-06-20", revealTimeUTC: "2026-06-20T13:00:00Z" },
+      4: { date: "2026-06-21", revealTimeUTC: "2026-06-21T13:00:00Z" },
     },
-    priorChampion: { name: 'Corbin "Lite It Up" Blount', year: 2025 },
+    priorChampion: { name: "J.J. Spaun", year: 2025 },
     theme: {
-      bg: "#0a0d18", bgDark: "#0f1428", bgMid: "#1c2040",
-      accent: "#c8303e", accentLight: "#e05060",
-      cream: "#f0f0f5", creamDim: "#9090a8",
-      cardBg: "rgba(255,255,255,0.04)", cardBorder: "rgba(200,48,62,0.22)",
+      bg: "#04080f", bgDark: "#08142a", bgMid: "#0d1f40",
+      accent: "#c8a84b", accentLight: "#e2c97e",
+      cream: "#eef2f8", creamDim: "#8898b8",
+      cardBg: "rgba(255,255,255,0.04)", cardBorder: "rgba(200,168,75,0.22)",
       scoreLow: "#5dba7e", scoreHigh: "#e07b6f", emoji: "🇺🇸",
-      gradient: "linear-gradient(135deg,#0a0d18 0%,#0f1428 50%,#0a0d18 100%)",
+      gradient: "linear-gradient(135deg,#04080f 0%,#08142a 50%,#04080f 100%)",
       photos: [
-        {
-          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Oakmont_Country_Club_church_pew_bunkers.jpg",
-          caption: "Church Pew Bunkers · Oakmont Country Club",
-        },
+        { url: "/courses/usopen-aerial.jpg",           caption: "Shinnecock Hills Golf Club · Southampton, NY" },
+        { url: "/courses/usopen-field.jpg",            caption: "US Open 2026 · Shinnecock Hills" },
+        { url: "/courses/usopen-scheffler.jpg",        caption: "Scottie Scheffler · US Open 2026" },
+        { url: "/courses/usopen-ludvig.jpg",           caption: "Ludvig Åberg · US Open 2026" },
+        { url: "/courses/usopen-rory-shinnecock.jpg",  caption: "Rory McIlroy on Shinnecock Hills" },
+        { url: "/courses/usopen-trophy-clubhouse.jpg", caption: "US Open Trophy · Shinnecock Hills Clubhouse" },
+        { url: "/courses/usopen-17th.jpg",             caption: "17th Hole · Shinnecock Hills Golf Club" },
+        { url: "/courses/usopen-course.jpg",           caption: "Shinnecock Hills Golf Club" },
+        { url: "/courses/usopen-bunker.jpg",           caption: "Shinnecock Hills Bunkers · US Open 2026" },
       ],
     },
     oddsKey: "golf_us_open_winner",
@@ -209,7 +214,7 @@ export function getActiveTournament(): Tournament {
     if (upcoming.length > 0) {
       const nextStart = new Date(upcoming[0].rounds[1].date + "T00:00:00Z");
       const daysUntilNext = (nextStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysUntilNext > 7) return lastCompleted;
+      if (daysUntilNext > 10) return lastCompleted;
     } else {
       return lastCompleted;
     }
@@ -221,18 +226,17 @@ export function getActiveTournament(): Tournament {
 
 export function getCurrentRound(t: Tournament): number {
   const now = new Date();
-  // If a round's DATE has started but its next round's DATE hasn't, we're in that round.
-  // Use the round dates (not reveal times) to determine which round is active.
+  // Before tournament starts — return 1 so picks tab shows R1
+  if (now < new Date(t.rounds[1].date + "T06:00:00-05:00")) return 1;
+  // During tournament — find which round we're in
   for (let r = 1; r <= 4; r++) {
-    const roundDate = new Date(t.rounds[r as 1|2|3|4].date + "T06:00:00-05:00"); // 6am ET tee times start
+    const roundDate = new Date(t.rounds[r as 1|2|3|4].date + "T06:00:00-05:00");
     const nextRoundDate = r < 4
       ? new Date(t.rounds[(r + 1) as 2|3|4].date + "T06:00:00-05:00")
       : new Date(t.rounds[4 as 4].date + "T23:59:59-05:00");
     if (now >= roundDate && now < nextRoundDate) return r;
   }
-  // Before tournament starts — return 1
-  if (now < new Date(t.rounds[1].date + "T06:00:00-05:00")) return 1;
-  // After tournament ends — return 4
+  // After tournament ends
   return 4;
 }
 

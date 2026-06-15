@@ -5,7 +5,7 @@ import {
   TOURNAMENTS, getActiveTournament, getCurrentRound, isRoundRevealed,
   isTournamentStarted, calcRoundScore, ROUND_LABELS, Tournament, TournamentId,
 } from "@/lib/tournaments";
-
+import { OWGR_RANKINGS } from "@/lib/golfers";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Pick { username: string; user_id: string; round_number: number; golfer: string; }
 interface GolferScore {
@@ -14,6 +14,7 @@ interface GolferScore {
   r1: number | null; r2: number | null; r3: number | null; r4: number | null;
   teeTime: string | null;
   thru: string | null;
+  worldRank: number | null;
 }
 type Tab = "picks" | "leaderboard" | "tournament" | "history" | "course" | "newsroom";
 
@@ -170,6 +171,58 @@ const COURSE_DATA: Record<string, { name: string; location: string; par: number;
       { hole:16, name:"Redbud",        par:3, yards:170, description:"Par-3 over water. The massive green allows creative shot-making — players often aim for the middle and let the slope feed the ball to the pin. The front-right Sunday pin is the most dramatic in golf.", notes:"When the Sunday pin is front-right, the gallery roars." },
       { hole:17, name:"Nandina",       par:4, yards:440, description:"Dogleg right par-4. The green is long and narrow, running front-to-back on a plateau. An approach from the fairway bunker leaves a very difficult angle. The right side of the green drops off sharply.", notes:"Underestimated hole — subtle difficulties everywhere." },
       { hole:18, name:"Holly",         par:4, yards:465, description:"Uphill closing par-4 in front of the iconic clubhouse. The fairway bunkers on the left demand a right-side tee shot. The elevated green has two tiers — above the hole means a downhill slider to close with.", notes:"The grandstand roar here is unlike anything in golf." },
+    ],
+  },
+  pga: {
+    name: "Aronimink Golf Club",
+    location: "Newtown Square, Pennsylvania",
+    par: 70,
+    yards: 7400,
+    holes: [
+      { hole:1,  name:"The Opener",     par:4, yards:455, description:"A wide driving hole that eases players into one of golf's most demanding courses. The fairway bunkers right demand a left-center drive. The approach plays to a large green with subtle front-to-back slope.", notes:"Take the birdie — you may not see many more today." },
+      { hole:2,  name:"The Hill",       par:4, yards:430, description:"Uphill par-4 with a tight driving corridor. The elevation change makes club selection on the approach critical — players routinely take one extra club to reach the elevated green.", notes:"Plays at least two clubs longer than the yardage." },
+      { hole:3,  name:"The Ravine",     par:3, yards:220, description:"Long par-3 over a ravine. The green is wide but shallow, demanding a precise long iron or hybrid. Missing short finds the ravine; long leaves a difficult chip off a tight lie.", notes:"Par is a very good score. Take your medicine." },
+      { hole:4,  name:"The Dogleg",     par:4, yards:470, description:"Sharp dogleg right with a bunker cluster at the corner. Long hitters can attempt to carry the corner but risk a hanging lie. The approach is downhill to a green that runs away from the player.", notes:"Most birdie putts here are from the fringe." },
+      { hole:5,  name:"The Creek",      par:5, yards:560, description:"Reachable par-5 with Cobbs Creek running along the entire left side. The green is angled away from the fairway, making the two-shot approach from the right half of the fairway dramatically easier.", notes:"The creek eats balls on Sunday when players get aggressive." },
+      { hole:6,  name:"The Alley",      par:4, yards:415, description:"Narrow driving corridor lined by mature oaks. The fairway slopes left, feeding drives into rough. A precise iron approach plays to a medium-sized green guarded by bunkers on both sides.", notes:"Fairway or bust. Any rough here is penal." },
+      { hole:7,  name:"The Redan",      par:3, yards:195, description:"Classic redan-style par-3 with the green angled left-to-right. The key is to land the ball left of the flag and let the slope carry it to the pin. Short right is a guaranteed bogey.", notes:"Don't fight the slope — use it." },
+      { hole:8,  name:"The Valley",     par:4, yards:460, description:"Downhill tee shot to a valley landing zone, then back uphill to the green. The drive must find the fairway — the approach from rough to an elevated green is almost impossible to control.", notes:"One of the best driving holes in championship golf." },
+      { hole:9,  name:"The Turn",       par:4, yards:440, description:"Closing hole of the front nine is a dogleg left bending toward the historic clubhouse. The green is protected by a deep front bunker and slopes sharply — putts from above the hole have ended rounds.", notes:"Birdie here and you walk to the 10th tee with momentum." },
+      { hole:10, name:"The Comeback",   par:4, yards:430, description:"Back nine opens with a wide fairway giving false confidence. The green has a false front that kicks anything slightly short back 20 yards. First-time visitors routinely three-putt.", notes:"The false front is the most underrated hazard in the field." },
+      { hole:11, name:"The Sycamores",  par:5, yards:545, description:"A birdie par-5 that favors precision over power. A row of sycamores down the right blocks the aggressive line to the green. Laying up to 100 yards is more reliable than trying to carry the trees.", notes:"Where the leaderboard reshuffles on Sunday." },
+      { hole:12, name:"The Plateau",    par:4, yards:445, description:"Approach plays to a severely elevated plateau green with falloffs on three sides. Missing the green anywhere except front-right results in a near-impossible up-and-down. One of the most penalizing greens on any major course.", notes:"Par here late on Sunday is worth a fist pump." },
+      { hole:13, name:"The Quarry",     par:3, yards:175, description:"Mid-length par-3 with an old stone quarry running behind the green. The visual intimidation of the quarry makes players instinctively bail short. The green is larger than it appears — commit to the right club.", notes:"Visualize the center of the green. Ignore the quarry." },
+      { hole:14, name:"The Bend",       par:4, yards:460, description:"Long dogleg right with a bunker precisely at the corner distance. The drive must carry 275+ to clear the bunker and open the ideal angle. The approach plays through a gap in the trees to a narrow green.", notes:"One of the most strategic driving holes of the week." },
+      { hole:15, name:"The Cathedral",  par:4, yards:450, description:"Towering oaks create a cathedral-like canopy over the fairway. The approach plays through a narrow gap into a tightly guarded green. Any miss left finds a steep bank; right finds a deep bunker.", notes:"The most beautiful hole at Aronimink. Also the most dangerous." },
+      { hole:16, name:"The Run-In",     par:4, yards:390, description:"Drivable par-4 for the longest hitters — 320 carries a bunker and leaves a chip. For everyone else it's a wedge-in situation. But the small, hard green rewards precision over power, and Sunday pin positions can be diabolical.", notes:"Go for it or play safe. There's no wrong answer — until you make one." },
+      { hole:17, name:"The Penultimate",par:3, yards:215, description:"Long and demanding par-3 over a ridge to a green that slopes hard away from the player. A low-running long iron is often preferred to a high-flight approach. Front-left pin positions are almost unreachable without going flag-hunting.", notes:"Made bogey on 17? Hole 18 awaits. No quitting now." },
+      { hole:18, name:"The Wanamaker",  par:4, yards:465, description:"The championship closer. Named for the Wanamaker Trophy sitting in the clubhouse directly behind the green, this uphill par-4 requires a precise drive between bunkers and a bold approach to a green protected by a deep front bunker. With the gallery packed ten-deep, it's the most electric finish in major golf this week.", notes:"The last putt here decides who lifts the Wanamaker Trophy." },
+    ],
+  },
+  usopen: {
+    name: "Shinnecock Hills Golf Club",
+    location: "Southampton, New York",
+    par: 70,
+    yards: 7445,
+    holes: [
+      { hole:1,  name:"The Opener",         par:4, yards:393, description:"A downhill opener that lulls players into a false sense of security. The prevailing ocean winds turn Shinnecock into an entirely different course by the afternoon. Approach is uphill to a small, firm green that feeds everything left.", notes:"Play conservative. The course gets harder from here." },
+      { hole:2,  name:"The Valley",          par:4, yards:450, description:"Long par-4 playing into the ocean breeze. The fairway tilts right, funneling errant drives into thick fescue. The green is severely undulated — putts from above the hole are nearly unplayable.", notes:"Take the iron off the tee if the wind is up. No bogey here." },
+      { hole:3,  name:"The Ridge",           par:3, yards:189, description:"Classic links-style par-3 playing across a ridge into a raised green. The wind swirls unpredictably on the plateau — what looks like a 7-iron becomes a 5-iron in seconds. Short is dead, long is dead.", notes:"Pick a club, commit, and accept the result." },
+      { hole:4,  name:"The Long Road",       par:4, yards:428, description:"Dogleg right requiring a precise drive to the left side to open the approach. The green sits above the fairway on a shelf — missing right leaves an impossible up-and-down. The rough at Shinnecock is penal all week.", notes:"Par here in afternoon conditions is a victory." },
+      { hole:5,  name:"The Cape",            par:5, yards:537, description:"The only par-5 on the front. Reachable in two but only from a perfect drive. The green is surrounded by bunkers and falls off sharply — going for it in two is all or nothing. Layup to 100 yards gives a birdie chance.", notes:"The easiest birdie opportunity on the course. Don't waste it." },
+      { hole:6,  name:"The Redan",           par:3, yards:202, description:"A pure redan hole — green angled left to right, the slope pulling the ball away from the flag. Players must aim left and let the wind and slope work the ball toward the hole. Fighting the slope produces bogey.", notes:"Trust the slope. Don't go right of the flag under any circumstances." },
+      { hole:7,  name:"The Long Hole",       par:4, yards:474, description:"The hardest hole on the front nine. Dead into the prevailing ocean wind, playing closer to 520 yards on breezy afternoons. The green is small and crowned — any shot not perfectly struck rolls off into thick fescue.", notes:"Par is a great score. Bogey here is recoverable. Double is not." },
+      { hole:8,  name:"The Short Road",      par:4, yards:390, description:"Shorter par-4 but deceivingly difficult. Wind changes direction here as the course bends. Aggressive play off the tee can leave a simple wedge — but the small, firm green repels anything not hit precisely on the right trajectory.", notes:"Birdie opportunity if the wind cooperates. Go for it." },
+      { hole:9,  name:"The Turn",            par:4, yards:438, description:"The front nine closer plays back toward the clubhouse. Downwind hole that sets up birdie chances for long hitters. The approach is from a downhill lie to a green that opens up from the left — a birdie here going into the turn is worth double.", notes:"Push hard for birdie. The back nine is brutal." },
+      { hole:10, name:"The Homeward Hole",   par:4, yards:408, description:"The back nine opener is one of the most beautiful holes in American golf. Playing toward the ocean horizon with the Atlantic visible in the background, the fairway ripples over ancient sand dunes. The approach plays downhill to a green cut into a hillside.", notes:"Breathtaking setting. Stay focused — it's not over." },
+      { hole:11, name:"The Hill",            par:4, yards:454, description:"Long uphill par-4 into the ocean breeze. One of the toughest driving holes of the week — miss right and the ball disappears into fescue; miss left and you're blocked by the hillside. The green rewards only precise iron play.", notes:"Bogey avoidance hole. Take your par and move on." },
+      { hole:12, name:"The Highland",        par:4, yards:462, description:"Elevated tee shot playing across rolling fescue-covered terrain. The fairway is generous but deceptive — what looks level plays severely downhill. The approach is a blind shot over a rise to a putting surface that slopes away dramatically.", notes:"Club up on the approach. The green is faster than it looks." },
+      { hole:13, name:"The Wreck",           par:4, yards:378, description:"Short par-4 with a drivable element for big hitters. But Shinnecock punishes aggression — the fairway is surrounded by deep fescue rough and bunkers that have claimed countless balls over the years. A precise iron off the tee is usually smarter.", notes:"Resist the driver. Smart 3-wood into the fairway, wedge, birdie." },
+      { hole:14, name:"The Plateau",         par:3, yards:197, description:"Mid-iron par-3 to a plateau green perched above the fairway. The most exposed hole on the course to wind — plays dramatically different every hour. Three tiers on the green make two-putting from the wrong tier nearly impossible.", notes:"Get the yardage right. Three putts from the top tier to the bottom are 70 feet." },
+      { hole:15, name:"The Road Home",       par:4, yards:421, description:"One of Shinnecock's defining holes. The fairway narrows at driving distance between deep fescue on both sides. The approach to a sharply bunkered green must thread a precise window — anything off-line faces a near-impossible recovery in US Open rough.", notes:"The hardest approach shot of the week. Aim at the center of the green every time." },
+      { hole:16, name:"The Ocean",           par:4, yards:522, description:"The longest par-4 in US Open history on some setups. Playing directly into the ocean wind off Southampton Sound, this hole has broken more tournament aspirations than any other. Dead straight into the gale, anything over par here feels catastrophic.", notes:"This hole has decided US Opens. Bogey and walk away. Don't make double." },
+      { hole:17, name:"The Short",           par:3, yards:179, description:"Downwind par-3 over a deep depression to a small green cut into a hillside. The only real scoring hole on the back nine. Playing downwind the club selection is deceptively short — players routinely take too much club and fly the green into thick rough.", notes:"Take one less club than you think. This is where birdies are made on Sunday." },
+      { hole:18, name:"The Home",            par:4, yards:453, description:"Shinnecock's legendary closer. The massive clubhouse looms directly behind the green as players make their final approach. The fairway is generous off the tee but the prevailing crosswind pushes everything right. The approach must carry a ridge and stop quickly on a two-tiered green. In US Open history this hole has decided championships on Sunday afternoon more than any other closing hole in the game.", notes:"The clubhouse crowd will be electric. Make your swing, trust your prep. This is what it's all for." },
     ],
   },
 };
@@ -388,11 +441,11 @@ function StatsTooltip({ espnId, playerName, visible }: { espnId: string; playerN
 
 // ─── Golfer Card ──────────────────────────────────────────────────────────────
 function GolferCard({
-  name, score, selected, burned, cut, disabled, odds, espnId, headshot, usagePct, onClick,
+  name, score, selected, burned, cut, disabled, odds, espnId, headshot, usagePct, sortMode, onClick,
 }: {
   name: string; score: GolferScore | undefined; selected: boolean; burned: boolean;
   cut: boolean; disabled: boolean; odds: string; espnId: string; headshot: string | null;
-  usagePct: number | null;
+  usagePct: number | null; sortMode: "alpha" | "leaderboard" | "world";
   onClick: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
@@ -465,7 +518,11 @@ function GolferCard({
             {burned && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", color: "var(--cream-dim)", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>USED</span>}
             {cut && <span style={{ fontSize: 10, background: "rgba(192,57,43,0.15)", color: "#e07b6f", padding: "1px 6px", borderRadius: 10, letterSpacing: "0.06em" }}>CUT</span>}
             {odds && !burned && !cut && <span style={{ fontSize: 11, color: "var(--accent-light, var(--accent))", opacity: 0.8 }}>{odds}</span>}
-            {score?.position && !burned && !cut && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+            {score?.position && !burned && !cut && sortMode !== "world" && <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>{score.position}</span>}
+            {sortMode === "world" && !burned && !cut && (() => {
+              const wr = score?.worldRank ?? OWGR_RANKINGS[name] ?? null;
+              return wr ? <span style={{ fontSize: 11, color: "var(--cream-dim)" }}>#{wr} WR</span> : null;
+            })()}
             {usagePct !== null && !burned && !cut && (
               <span style={{
                 fontSize: 10, padding: "1px 5px", borderRadius: 4,
@@ -794,14 +851,13 @@ function MyPicksTab({
   onPicksChanged: () => void;
 }) {
   const round = currentRound;
-  // Always auto-advance to next round when current round is locked (tee times started)
-  // and admin hasn't explicitly unlocked it via skipDeadline.
-  // e.g. during R2 (locked) → show R3 picks form automatically.
-  // When admin sets roundOverride + skipDeadline, that combo keeps the current round open.
+  // isRoundRevealed checks if the reveal time (8am CT) has passed.
+  // Only auto-advance if the CURRENT round's deadline has passed AND skipDeadline is off.
+  // Never advance if the tournament hasn't started yet (round 1 deadline hasn't passed).
   const currentRevealed = isRoundRevealed(tournament, round);
-  const displayRound = (currentRevealed && !skipDeadline && round < 4) ? round + 1 : round;
+  const tournamentStarted = isRoundRevealed(tournament, 1);
+  const displayRound = (tournamentStarted && currentRevealed && !skipDeadline && round < 4) ? round + 1 : round;
   const roundDeadlinePassed = isRoundRevealed(tournament, displayRound);
-  // skipDeadline (from admin) forces the form open regardless of clock time
   const revealed = roundDeadlinePassed && !revealAll && !skipDeadline;
   const revealDate = new Date(tournament.rounds[displayRound as 1|2|3|4].revealTimeUTC);
   const [countdown, setCountdown] = useState(fmtCountdown(revealDate));
@@ -810,7 +866,7 @@ function MyPicksTab({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saved, setSaved] = useState(false);
-  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha">("alpha");
+  const [sortMode, setSortMode] = useState<"leaderboard" | "alpha" | "world">("alpha");
   const [searchQuery, setSearchQuery] = useState("");
 
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
@@ -869,9 +925,17 @@ function MyPicksTab({
         body: JSON.stringify({ tournament: tournament.id, round: displayRound, golfers: selected }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
-      setSaved(true); setSuccess("Picks saved!"); onPicksChanged();
-    } catch { setError("Network error"); }
+      if (!res.ok) {
+        // Token expired — prompt re-login
+        if (res.status === 401) {
+          setError("Session expired — please log out and log back in");
+        } else {
+          setError(data.error ?? "Failed to save picks — please try again");
+        }
+        return;
+      }
+      setSaved(true); setSuccess("Picks saved! ✓"); onPicksChanged();
+    } catch { setError("Network error — check your connection and try again"); }
     finally { setSubmitting(false); }
   }
 
@@ -887,12 +951,32 @@ function MyPicksTab({
       if (aAvail && !bAvail) return -1;
       if (!aAvail && bAvail) return 1;
       if (sortMode === "alpha") {
-        // Sort by first name
         const aFirst = a.name.split(" ")[0] ?? a.name;
         const bFirst = b.name.split(" ")[0] ?? b.name;
         return aFirst.localeCompare(bFirst);
       }
-      return a.totalScore - b.totalScore;
+      // Rank sort: use ESPN position string as primary (most accurate)
+      // Players who haven't started (r1 null) go to the bottom
+      if (sortMode === "world") {
+        // World ranking: ESPN worldRank first, fall back to static OWGR lookup
+        const aRank = a.worldRank ?? OWGR_RANKINGS[a.name] ?? 9999;
+        const bRank = b.worldRank ?? OWGR_RANKINGS[b.name] ?? 9999;
+        return aRank - bRank;
+      }
+      // Tournament leaderboard rank sort
+      const aStarted = a.r1 !== null || (a.thru !== null && a.thru !== "0");
+      const bStarted = b.r1 !== null || (b.thru !== null && b.thru !== "0");
+      if (aStarted && !bStarted) return -1;
+      if (!aStarted && bStarted) return 1;
+      if (!aStarted && !bStarted) {
+        // Both not started — sort by tee time
+        return (a.teeTime ?? "").localeCompare(b.teeTime ?? "");
+      }
+      // Both started — sort by position number (T1 → 1, T4 → 4)
+      const posA = parseInt((a.position ?? "").replace(/[^0-9]/g, "") || "999", 10);
+      const posB = parseInt((b.position ?? "").replace(/[^0-9]/g, "") || "999", 10);
+      if (posA !== posB) return posA - posB;
+      return a.totalScore - b.totalScore; // tiebreak by score
     });
 
   const scoringNote = displayRound <= 2
@@ -917,12 +1001,40 @@ function MyPicksTab({
           )}
         </div>
 
-        {/* Selected picks summary */}
+        {/* Selected picks summary + top action buttons */}
         {selected.length > 0 && (
           <div style={{ marginBottom: 12 }}>
-            <p style={{ fontSize: 11, color: "var(--cream-dim)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-              {revealed ? "Your picks" : `Selected (${selected.length}/3)`}
-            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <p style={{ fontSize: 11, color: "var(--cream-dim)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
+                {revealed ? "Your picks" : `Selected (${selected.length}/3)`}
+              </p>
+              {!revealed && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => { setSelected([]); setSaved(false); setSuccess(""); setError(""); }}
+                    style={{
+                      fontSize: 12, padding: "4px 10px", borderRadius: 6,
+                      background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                      color: "var(--cream-dim)", cursor: "pointer",
+                    }}>
+                    ✕ Clear
+                  </button>
+                  <button
+                    onClick={submit}
+                    disabled={selected.length !== 3 || submitting}
+                    style={{
+                      fontSize: 12, padding: "4px 12px", borderRadius: 6,
+                      background: selected.length === 3 ? "var(--accent)" : "rgba(255,255,255,0.06)",
+                      border: `1px solid ${selected.length === 3 ? "var(--accent)" : "var(--card-border)"}`,
+                      color: selected.length === 3 ? "var(--bg)" : "var(--cream-dim)",
+                      cursor: selected.length !== 3 || submitting ? "not-allowed" : "pointer",
+                      fontWeight: 600, opacity: selected.length !== 3 || submitting ? 0.5 : 1,
+                    }}>
+                    {submitting ? "Saving…" : saved ? "✓ Update" : "🔒 Save"}
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {selected.map((g) => {
                 const sc = scoreMap[g];
@@ -967,7 +1079,7 @@ function MyPicksTab({
               </div>
               {/* Sort toggle */}
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                {(["alpha", "leaderboard"] as const).map(mode => (
+                {(["alpha", "leaderboard", "world"] as const).map(mode => (
                   <button key={mode} onClick={() => setSortMode(mode)} style={{
                     padding: "6px 10px", borderRadius: 6, fontSize: 12,
                     background: sortMode === mode ? "var(--accent)" : "rgba(255,255,255,0.06)",
@@ -975,7 +1087,7 @@ function MyPicksTab({
                     border: `1px solid ${sortMode === mode ? "var(--accent)" : "var(--card-border)"}`,
                     cursor: "pointer", fontWeight: sortMode === mode ? 600 : 400,
                   }}>
-                    {mode === "alpha" ? "A–Z" : "Rank"}
+                    {mode === "alpha" ? "A–Z" : mode === "leaderboard" ? "Rank" : "World"}
                   </button>
                 ))}
               </div>
@@ -1015,6 +1127,7 @@ function MyPicksTab({
                   espnId={gs.espnId}
                   headshot={gs.headshot}
                   usagePct={poolUsagePct(gs.name)}
+                  sortMode={sortMode}
                   onClick={() => toggle(gs.name)}
                 />
               ))}
@@ -1088,21 +1201,247 @@ function MyPicksTab({
 }
 
 // ─── Leaderboard Tab ──────────────────────────────────────────────────────────
+// ─── Live Feed Panel ──────────────────────────────────────────────────────────
+const FEED_EMOJIS = ["🔥", "😂", "💀", "👏", "😤", "🐦", "😱", "🏆"];
+
+function LiveFeedPanel({ tournament, allPicks, scores, currentRound, userId, username }: {
+  tournament: Tournament; allPicks: Pick[]; scores: GolferScore[];
+  currentRound: number; userId: string; username: string;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevScoresRef = useRef<Record<string, number | null>>({});
+  const isFirstLoad = useRef(true);
+
+  useEffect(() => {
+    fetch(`/api/chat?tournament=${tournament.id}`)
+      .then(r => r.json())
+      .then(d => {
+        setMessages(d.messages ?? []);
+        setReactions(d.reactions ?? []);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      });
+  }, [tournament.id]);
+
+  // Realtime subscription
+  useEffect(() => {
+    let channel: ReturnType<() => { unsubscribe: () => void }> | null = null;
+    import("@/lib/supabase").then(({ createBrowserSupabase }) => {
+      if (!createBrowserSupabase) return;
+      const sb = createBrowserSupabase();
+      channel = sb.channel("livefeed")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
+          const msg = payload.new as ChatMessage;
+          if (msg.tournament !== tournament.id) return;
+          setMessages(prev => [...prev, msg]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => {
+          fetch(`/api/chat?tournament=${tournament.id}`).then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+        })
+        .subscribe();
+    }).catch(() => {});
+    return () => { channel?.unsubscribe(); };
+  }, [tournament.id]);
+
+  // Score alerts for all picked players
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      scores.forEach(s => {
+        const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+        prevScoresRef.current[s.name] = s[key];
+      });
+      isFirstLoad.current = false;
+      return;
+    }
+    const roundPicks = allPicks.filter(p => p.round_number === currentRound);
+    scores.forEach(s => {
+      const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+      const cur = s[key];
+      const prev = prevScoresRef.current[s.name] ?? null;
+      if (cur === null || prev === null || cur === prev) { prevScoresRef.current[s.name] = cur; return; }
+      const diff = cur - prev;
+      const pickers = roundPicks.filter(p => p.golfer === s.name).map(p => p.username);
+      if (!pickers.length) { prevScoresRef.current[s.name] = cur; return; }
+      const hole = s.thru && s.thru !== "F" ? ` on hole ${s.thru}` : "";
+      const pickerStr = pickers.join(", ");
+      let type = "system", msg = "";
+      if (diff <= -2)      { type = "eagle";  msg = `🦅 EAGLE! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff === -1) { type = "birdie"; msg = `🐦 Birdie! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff === 1)  { type = "bogey";  msg = `💩 Bogey. ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff >= 2)   { type = "bogey";  msg = `☠️ Double bogey. ${s.name}${hole} — picked by ${pickerStr}`; }
+      if (msg) {
+        fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tournament: tournament.id, username: "🏌️ Live", message: msg, type }) });
+      }
+      prevScoresRef.current[s.name] = cur;
+    });
+  }, [scores, allPicks, currentRound, tournament.id]);
+
+  async function sendMessage() {
+    if (!input.trim() || sending) return;
+    setSending(true);
+    const avatarSlug = username.toLowerCase().replace(/\s+/g, "-");
+    await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tournament: tournament.id, user_id: userId, username, avatar_slug: avatarSlug, message: input.trim(), type: "user" }),
+    });
+    setInput(""); setSending(false);
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === userId && r.emoji === emoji);
+    await fetch("/api/chat-reactions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_id: messageId, user_id: userId, username, emoji, action: existing ? "remove" : "add" }),
+    });
+    fetch(`/api/chat?tournament=${tournament.id}`).then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+    setReactionPickerFor(null);
+  }
+
+  function getReactionGroups(messageId: string) {
+    const msgReactions = reactions.filter(r => r.message_id === messageId);
+    const groups: Record<string, { count: number; users: string[]; mine: boolean }> = {};
+    msgReactions.forEach(r => {
+      if (!groups[r.emoji]) groups[r.emoji] = { count: 0, users: [], mine: false };
+      groups[r.emoji].count++;
+      groups[r.emoji].users.push(r.username);
+      if (r.user_id === userId) groups[r.emoji].mine = true;
+    });
+    return groups;
+  }
+
+  const typeStyle: Record<string, { bg: string; border: string; color: string }> = {
+    birdie: { bg: "rgba(93,186,126,0.08)",  border: "rgba(93,186,126,0.2)",  color: "#5dba7e" },
+    eagle:  { bg: "rgba(201,168,76,0.12)",  border: "rgba(201,168,76,0.3)",  color: "#c9a84c" },
+    bogey:  { bg: "rgba(192,57,43,0.08)",   border: "rgba(192,57,43,0.2)",   color: "#e07b6f" },
+    system: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" },
+    user:   { bg: "transparent",            border: "transparent",            color: "" },
+  };
+
+  return (
+    <div style={{
+      background: "var(--card-bg)", border: "1px solid var(--card-border)",
+      borderRadius: 10, display: "flex", flexDirection: "column", height: 600,
+    }}>
+      {/* Header */}
+      <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--card-border)", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 14 }}>💬</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)", letterSpacing: "0.06em" }}>LIVE FEED</span>
+        <span style={{ fontSize: 11, color: "var(--cream-dim)", marginLeft: "auto" }}>Picks · Scores · Chat</span>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+        {messages.length === 0 && (
+          <div style={{ textAlign: "center", padding: 24, color: "var(--cream-dim)", fontSize: 13, fontStyle: "italic" }}>
+            Live score updates and chat will appear here ⛳
+          </div>
+        )}
+        {messages.map((msg) => {
+          const isUser = msg.type === "user";
+          const isMe = msg.user_id === userId;
+          const st = typeStyle[msg.type] ?? typeStyle.system;
+          const rg = getReactionGroups(msg.id);
+
+          return (
+            <div key={msg.id} style={{ marginBottom: 6 }}>
+              {isUser ? (
+                <div style={{ display: "flex", flexDirection: isMe ? "row-reverse" : "row", gap: 6, alignItems: "flex-end" }}>
+                  <div style={{ maxWidth: "80%" }}>
+                    {!isMe && <div style={{ fontSize: 10, color: "var(--cream-dim)", marginBottom: 2 }}>{msg.username}</div>}
+                    <div onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
+                      style={{
+                        padding: "7px 11px", borderRadius: isMe ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+                        background: isMe ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.07)",
+                        border: `1px solid ${isMe ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.1)"}`,
+                        fontSize: 13, color: "var(--cream)", cursor: "pointer", lineHeight: 1.4,
+                      }}>{msg.message}</div>
+                  </div>
+                </div>
+              ) : (
+                <div onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
+                  style={{
+                    padding: "6px 10px", borderRadius: 8, cursor: "pointer",
+                    background: st.bg, border: `1px solid ${st.border}`,
+                    fontSize: 12, color: st.color, textAlign: "center" as const, lineHeight: 1.4,
+                  }}>{msg.message}</div>
+              )}
+
+              {reactionPickerFor === msg.id && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: isMe ? "flex-end" : "flex-start",
+                  background: "rgba(20,20,30,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "4px 8px", marginTop: 2 }}>
+                  {FEED_EMOJIS.map(e => (
+                    <button key={e} onClick={() => toggleReaction(msg.id, e)}
+                      style={{ fontSize: 16, background: "none", border: "none", cursor: "pointer", padding: "1px 3px" }}>{e}</button>
+                  ))}
+                </div>
+              )}
+
+              {Object.keys(rg).length > 0 && (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 2, justifyContent: isMe && isUser ? "flex-end" : "flex-start" }}>
+                  {Object.entries(rg).map(([emoji, data]) => (
+                    <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)} title={data.users.join(", ")}
+                      style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, cursor: "pointer",
+                        background: data.mine ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.06)",
+                        border: `1px solid ${data.mine ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.1)"}`,
+                        color: "var(--cream-dim)" }}>
+                      {emoji} {data.count}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: "8px 12px", borderTop: "1px solid var(--card-border)", display: "flex", gap: 8, alignItems: "center" }}>
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } }}
+          placeholder="Message the pool…" maxLength={280}
+          style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 16, padding: "7px 12px", color: "var(--cream)", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+        <button onClick={sendMessage} disabled={!input.trim() || sending}
+          style={{ background: input.trim() ? "var(--accent)" : "rgba(255,255,255,0.08)", border: "none",
+            borderRadius: "50%", width: 34, height: 34, cursor: input.trim() ? "pointer" : "default",
+            fontSize: 14, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>➤</button>
+      </div>
+    </div>
+  );
+}
+
 function LeaderboardTab({
   tournament, allPicks, scores, playerCount, registeredUsers, currentRound, pickStatus,
+  userId, username,
 }: {
   tournament: Tournament; allPicks: Pick[]; scores: GolferScore[];
   playerCount: number; registeredUsers: {id: string; username: string}[];
   currentRound: number; pickStatus: Record<string, number[]>;
+  userId: string; username: string;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [hideNoPicks, setHideNoPicks] = useState(false);
   const scoreMap = Object.fromEntries(scores.map((s) => [s.name, s]));
-  const purse = playerCount * 50;
 
-  // Build userMap from BOTH picks AND registered users
+  // Build userMap from registered users + picks + pickStatus keys
+  // pickStatus always has all users who have ever submitted picks
   const userMap: Record<string, string> = {};
   registeredUsers.forEach((u) => { userMap[u.id] = u.username; });
-  allPicks.forEach((p) => { userMap[p.user_id] = p.username; });
+  allPicks.forEach((p) => { userMap[p.user_id] = p.username ?? userMap[p.user_id] ?? p.user_id; });
+  // If still a raw UUID, label it Unknown Player
+  Object.keys(pickStatus).forEach(uid => {
+    if (!userMap[uid]) {
+      const isUuid = /^[0-9a-f-]{36}$/.test(uid);
+      userMap[uid] = isUuid ? "Unknown Player" : uid;
+    }
+  });
 
   // Use pickStatus (from /api/pick-status) which shows all rounds regardless of reveal time
   // This ensures green checkmarks always reflect actual submission state
@@ -1155,14 +1494,11 @@ function LeaderboardTab({
     return Math.round((golferPickCount[golfer].size / totalUsersInPool) * 100);
   };
 
-  if (!standings.length) {
+  if (!standings.length && registeredUsers.length === 0) {
     return (
       <div style={card}>
         <p style={{ color: "var(--cream-dim)", fontStyle: "italic", textAlign: "center", padding: 16 }}>
-          Standings will appear once picks are submitted and revealed.
-        </p>
-        <p style={{ color: "var(--cream-dim)", fontSize: 12, textAlign: "center", padding: "0 16px 16px" }}>
-          If you&apos;re testing: go to Admin → 🧪 Enable Full Test Mode, have all users submit picks, then Fill &amp; Save manual scores.
+          Loading participants…
         </p>
       </div>
     );
@@ -1185,10 +1521,17 @@ function LeaderboardTab({
   const latestRound = standings.length > 0
     ? Math.max(...standings.flatMap(u => Object.keys(u.rounds).map(Number)), 0)
     : 0;
+  const r1Revealed = isRoundRevealed(tournament, 1);
+  const activeCount = standings.filter(u => Object.keys(u.rounds).length > 0).length;
+  const displayPlayerCount = hideNoPicks && r1Revealed ? activeCount : playerCount;
+  const purse = displayPlayerCount * 50;
+  // When hiding, only show users who have picks in at least one revealed round
+  const visibleStandings = hideNoPicks && r1Revealed
+    ? standings.filter(u => Object.keys(u.rounds).length > 0)
+    : standings;
 
-  return (
+  const leaderboardContent = (
     <div style={{ fontFamily: "'EB Garamond', serif" }}>
-
       {/* Masters-style header bar */}
       <div style={{
         background: "linear-gradient(180deg, #1a4a2e 0%, #0f3320 100%)",
@@ -1204,8 +1547,19 @@ function LeaderboardTab({
             <div style={{ fontSize: 22, color: "#c9a84c", fontFamily: "Playfair Display, serif", fontWeight: 600 }}>${purse.toLocaleString()}</div>
           </div>
           <div style={{ textAlign: "right" as const }}>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{playerCount} players · $50 buy-in</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{displayPlayerCount} players · $50 buy-in</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2, fontStyle: "italic" }}>Lowest cumulative score wins</div>
+            {r1Revealed && (
+              <button onClick={() => setHideNoPicks(h => !h)} style={{
+                marginTop: 6, fontSize: 10, padding: "3px 10px", borderRadius: 12,
+                background: hideNoPicks ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${hideNoPicks ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.15)"}`,
+                color: hideNoPicks ? "#c9a84c" : "rgba(255,255,255,0.4)",
+                cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" as const,
+              }}>
+                {hideNoPicks ? "👁 Showing active" : "Hide no picks"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1231,16 +1585,16 @@ function LeaderboardTab({
 
       {/* Standings rows */}
       <div style={{ border: "1px solid #2d6b40", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden", marginBottom: 16 }}>
-        {standings.map((u, i) => {
+        {visibleStandings.map((u, i) => {
           const isOpen = expanded === u.uid;
-          const isLeader = i === 0;
-          // True rank = number of players with a strictly better score + 1
-          const trueRank = standings.filter(s => s.total < u.total).length + 1;
-          const isTied = standings.filter(s => s.total === u.total).length > 1;
-          const posLabel = isTied ? `T${trueRank}` : `${trueRank}`;
+          const hasNoPicks = Object.keys(u.rounds).length === 0;
+          const isLeader = i === 0 && !hasNoPicks;
+          const trueRank = standings.filter(s => s.total < u.total && Object.keys(s.rounds).length > 0).length + 1;
+          const isTied = standings.filter(s => s.total === u.total && Object.keys(s.rounds).length > 0).length > 1;
+          const posLabel = hasNoPicks ? "—" : (isTied ? `T${trueRank}` : `${trueRank}`);
 
           return (
-            <div key={u.uid} style={{ borderBottom: i < standings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+            <div key={u.uid} style={{ borderBottom: i < visibleStandings.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
               {/* Main row */}
               <button
                 onClick={() => setExpanded(isOpen ? null : u.uid)}
@@ -1340,11 +1694,11 @@ function LeaderboardTab({
                 {/* Total */}
                 <div style={{
                   textAlign: "center" as const, fontFamily: "monospace", fontSize: 17, fontWeight: 700,
-                  color: mastersColor(u.total),
-                  background: isLeader ? "rgba(192,57,43,0.12)" : "transparent",
+                  color: hasNoPicks ? "rgba(255,255,255,0.25)" : mastersColor(u.total),
+                  background: isLeader && !hasNoPicks ? "rgba(192,57,43,0.12)" : "transparent",
                   borderRadius: 4, padding: "2px 4px",
                 }}>
-                  {mastersScore(u.total)}
+                  {hasNoPicks ? <span style={{ fontSize: 11, letterSpacing: "0.06em" }}>NO PICKS</span> : mastersScore(u.total)}
                 </div>
               </button>
 
@@ -1452,6 +1806,30 @@ function LeaderboardTab({
       )}
     </div>
   );
+
+  return (
+    <div style={{
+      display: "flex", gap: 16, alignItems: "flex-start",
+      flexDirection: "column" as const,
+    }}
+      className="leaderboard-split">
+      {/* Leaderboard — 65% on desktop */}
+      <div style={{ flex: "0 0 100%", width: "100%" }} className="leaderboard-main">
+        {leaderboardContent}
+      </div>
+      {/* Live Feed — 35% on desktop */}
+      <div style={{ flex: "0 0 100%", width: "100%" }} className="leaderboard-feed">
+        <LiveFeedPanel
+          tournament={tournament}
+          allPicks={allPicks}
+          scores={scores}
+          currentRound={currentRound}
+          userId={userId}
+          username={username}
+        />
+      </div>
+    </div>
+  );
 }
 
 // ─── History Tab ──────────────────────────────────────────────────────────────
@@ -1542,7 +1920,7 @@ function HistoryTab({ tournament, allPicks, scores }: { tournament: Tournament; 
 
 
 // ─── Tournament Leaderboard Tab ───────────────────────────────────────────────
-function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
+function TournamentLeaderboardTab({ scores, tournament }: { scores: GolferScore[]; tournament: Tournament }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   function fmtScore(s: number | null) {
@@ -1589,8 +1967,8 @@ function TournamentLeaderboardTab({ scores }: { scores: GolferScore[] }) {
     <div>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 4 }}>Live</div>
-        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)" }}>Masters Leaderboard</div>
-        <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 4 }}>Augusta National · {active.length} players · Updated every 2 min</div>
+        <div style={{ fontSize: 22, fontFamily: "Playfair Display, serif", color: "var(--cream)" }}>{tournament.name} Leaderboard</div>
+        <div style={{ fontSize: 12, color: "var(--cream-dim)", marginTop: 4 }}>{tournament.location} · {active.length} players · Updated every 2 min</div>
       </div>
 
       {/* Header */}
@@ -1732,6 +2110,289 @@ const SOURCE_COLORS: Record<string, string> = {
   golf: "#1a5c2a",
   golfchannel: "#003087",
 };
+
+// ─── Chat Tab ─────────────────────────────────────────────────────────────────
+interface ChatMessage {
+  id: string; tournament: string; user_id: string | null; username: string;
+  avatar_slug: string | null; message: string; type: string;
+  metadata: Record<string, unknown>; created_at: string;
+}
+interface ChatReaction { id: string; message_id: string; user_id: string; username: string; emoji: string; }
+
+const CHAT_EMOJIS = ["🔥", "😂", "💀", "👏", "😤", "🐦", "😱", "🏆"];
+
+function ChatTab({ tournament, userId, username, picks, scores, currentRound, onRead }: {
+  tournament: Tournament; userId: string; username: string;
+  picks: Pick[]; scores: GolferScore[]; currentRound: number; onRead: () => void;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [reactions, setReactions] = useState<ChatReaction[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevScoresRef = useRef<Record<string, number | null>>({});
+  const prevR1Ref = useRef<Record<string, number | null>>({});
+  const isFirstLoad = useRef(true);
+
+  // Load messages
+  useEffect(() => {
+    onRead();
+    fetch(`/api/chat?tournament=${tournament.id}`)
+      .then(r => r.json())
+      .then(d => {
+        setMessages(d.messages ?? []);
+        setReactions(d.reactions ?? []);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      });
+  }, [tournament.id]);
+
+  // Supabase realtime subscription
+  useEffect(() => {
+    let channel: ReturnType<() => { unsubscribe: () => void }> | null = null;
+    import("@/lib/supabase").then(({ createBrowserSupabase }) => {
+      if (!createBrowserSupabase) return;
+      const sb = createBrowserSupabase();
+      channel = sb.channel("chat")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
+          const msg = payload.new as ChatMessage;
+          if (msg.tournament !== tournament.id) return;
+          setMessages(prev => [...prev, msg]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => {
+          fetch(`/api/chat?tournament=${tournament.id}`)
+            .then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+        })
+        .subscribe();
+    }).catch(() => {});
+    return () => { channel?.unsubscribe(); };
+  }, [tournament.id]);
+
+  // Auto-post score alerts for picked players
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      scores.forEach(s => {
+        const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+        prevScoresRef.current[s.name] = s[key];
+      });
+      isFirstLoad.current = false;
+      return;
+    }
+    const roundPicks = picks.filter(p => p.round_number === currentRound);
+    scores.forEach(s => {
+      const key = `r${currentRound}` as "r1"|"r2"|"r3"|"r4";
+      const cur = s[key];
+      const prev = prevScoresRef.current[s.name] ?? null;
+      if (cur === null || prev === null || cur === prev) { prevScoresRef.current[s.name] = cur; return; }
+      const diff = cur - prev;
+      const pickers = roundPicks.filter(p => p.golfer === s.name).map(p => p.username);
+      if (!pickers.length) { prevScoresRef.current[s.name] = cur; return; }
+      const hole = s.thru && s.thru !== "F" ? ` on hole ${s.thru}` : "";
+      const pickerStr = pickers.join(", ");
+      let type = "system", msg = "", emoji = "";
+      if (diff <= -2) { type = "eagle"; emoji = "🦅"; msg = `${emoji} EAGLE! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff === -1) { type = "birdie"; emoji = "🐦"; msg = `${emoji} Birdie! ${s.name}${hole} — picked by ${pickerStr}`; }
+      else if (diff >= 1) { type = "bogey"; emoji = "💩"; msg = `${emoji} Bogey. ${s.name}${hole} — picked by ${pickerStr}`; }
+      if (msg) {
+        fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tournament: tournament.id, username: "🏌️ Live Update", message: msg, type }) });
+      }
+      prevScoresRef.current[s.name] = cur;
+    });
+  }, [scores, picks, currentRound, tournament.id]);
+
+  async function sendMessage() {
+    if (!input.trim() || sending) return;
+    setSending(true);
+    const avatarSlug = username.toLowerCase().replace(/\s+/g, "-");
+    await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tournament: tournament.id, user_id: userId, username, avatar_slug: avatarSlug, message: input.trim(), type: "user" }),
+    });
+    setInput("");
+    setSending(false);
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    const existing = reactions.find(r => r.message_id === messageId && r.user_id === userId && r.emoji === emoji);
+    await fetch("/api/chat-reactions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_id: messageId, user_id: userId, username, emoji, action: existing ? "remove" : "add" }),
+    });
+    // Refresh reactions
+    fetch(`/api/chat?tournament=${tournament.id}`).then(r => r.json()).then(d => setReactions(d.reactions ?? []));
+    setReactionPickerFor(null);
+  }
+
+  function getReactionGroups(messageId: string) {
+    const msgReactions = reactions.filter(r => r.message_id === messageId);
+    const groups: Record<string, { count: number; users: string[]; mine: boolean }> = {};
+    msgReactions.forEach(r => {
+      if (!groups[r.emoji]) groups[r.emoji] = { count: 0, users: [], mine: false };
+      groups[r.emoji].count++;
+      groups[r.emoji].users.push(r.username);
+      if (r.user_id === userId) groups[r.emoji].mine = true;
+    });
+    return groups;
+  }
+
+  function fmtTime(ts: string) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  }
+
+  const msgTypeStyle: Record<string, { bg: string; border: string; label: string; labelColor: string }> = {
+    birdie: { bg: "rgba(93,186,126,0.08)", border: "rgba(93,186,126,0.2)", label: "🐦 Birdie", labelColor: "#5dba7e" },
+    eagle:  { bg: "rgba(201,168,76,0.1)",  border: "rgba(201,168,76,0.3)",  label: "🦅 Eagle!",  labelColor: "#c9a84c" },
+    bogey:  { bg: "rgba(192,57,43,0.08)",  border: "rgba(192,57,43,0.2)",   label: "💩 Bogey",   labelColor: "#e07b6f" },
+    system: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", label: "📢",        labelColor: "rgba(255,255,255,0.4)" },
+    user:   { bg: "transparent", border: "transparent", label: "", labelColor: "" },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 200px)", maxWidth: 700, margin: "0 auto", padding: "0 12px" }}>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
+        {messages.length === 0 && (
+          <div style={{ textAlign: "center", padding: 40, color: "var(--cream-dim)", fontStyle: "italic" }}>
+            No messages yet. Start the conversation! ⛳
+          </div>
+        )}
+        {messages.map((msg, i) => {
+          const isUser = msg.type === "user";
+          const isMe = msg.user_id === userId;
+          const style = msgTypeStyle[msg.type] ?? msgTypeStyle.system;
+          const reactionGroups = getReactionGroups(msg.id);
+          const showDateSep = i === 0 || new Date(messages[i-1].created_at).toDateString() !== new Date(msg.created_at).toDateString();
+
+          return (
+            <div key={msg.id}>
+              {showDateSep && (
+                <div style={{ textAlign: "center", margin: "12px 0 8px", fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>
+                  {new Date(msg.created_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </div>
+              )}
+              <div style={{
+                display: "flex", flexDirection: isMe && isUser ? "row-reverse" : "row",
+                alignItems: "flex-start", gap: 8, marginBottom: 6,
+                justifyContent: isUser ? (isMe ? "flex-end" : "flex-start") : "center",
+              }}>
+                {/* Avatar — only for other users' messages */}
+                {isUser && !isMe && (
+                  <img src={`/avatars/${msg.avatar_slug}.jpg`}
+                    onError={e => { (e.target as HTMLImageElement).src = "/avatars/README.md"; (e.target as HTMLImageElement).style.display = "none"; }}
+                    style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 2 }} alt="" />
+                )}
+
+                <div style={{ maxWidth: isUser ? "72%" : "90%" }}>
+                  {/* Name + time */}
+                  {isUser && (
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 3,
+                      textAlign: isMe ? "right" : "left", letterSpacing: "0.04em" }}>
+                      {!isMe && <span style={{ color: "var(--cream-dim)", fontWeight: 600, marginRight: 6 }}>{msg.username}</span>}
+                      {fmtTime(msg.created_at)}
+                    </div>
+                  )}
+
+                  {/* Bubble */}
+                  <div
+                    onClick={() => setReactionPickerFor(reactionPickerFor === msg.id ? null : msg.id)}
+                    style={{
+                      padding: isUser ? "9px 13px" : "7px 14px",
+                      borderRadius: isUser ? (isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px") : 10,
+                      background: isUser
+                        ? (isMe ? "rgba(201,168,76,0.18)" : "rgba(255,255,255,0.07)")
+                        : style.bg,
+                      border: `1px solid ${isUser ? (isMe ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.1)") : style.border}`,
+                      cursor: "pointer", fontSize: isUser ? 14 : 13,
+                      color: isUser ? "var(--cream)" : "var(--cream-dim)",
+                      fontFamily: isUser ? "inherit" : "monospace",
+                      textAlign: isUser ? "left" : "center",
+                      lineHeight: 1.45,
+                    }}>
+                    {!isUser && style.label && (
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: style.labelColor, marginBottom: 3 }}>{style.label}</div>
+                    )}
+                    {msg.message}
+                  </div>
+
+                  {/* Reaction picker */}
+                  {reactionPickerFor === msg.id && (
+                    <div style={{
+                      display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4,
+                      background: "rgba(20,20,30,0.95)", border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 20, padding: "6px 10px",
+                      justifyContent: isMe ? "flex-end" : "flex-start",
+                    }}>
+                      {CHAT_EMOJIS.map(e => (
+                        <button key={e} onClick={() => toggleReaction(msg.id, e)}
+                          style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", padding: "2px 4px", borderRadius: 6,
+                            opacity: reactions.find(r => r.message_id === msg.id && r.user_id === userId && r.emoji === e) ? 1 : 0.6 }}>
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Existing reactions */}
+                  {Object.keys(reactionGroups).length > 0 && (
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                      {Object.entries(reactionGroups).map(([emoji, data]) => (
+                        <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
+                          title={data.users.join(", ")}
+                          style={{
+                            fontSize: 12, padding: "2px 7px", borderRadius: 12, cursor: "pointer",
+                            background: data.mine ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.06)",
+                            border: `1px solid ${data.mine ? "rgba(201,168,76,0.35)" : "rgba(255,255,255,0.1)"}`,
+                            color: "var(--cream-dim)", display: "flex", alignItems: "center", gap: 4,
+                          }}>
+                          {emoji} <span style={{ fontSize: 11 }}>{data.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{
+        borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12, paddingBottom: 16,
+        display: "flex", gap: 10, alignItems: "flex-end",
+      }}>
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+          placeholder="Message the pool… (Enter to send)"
+          maxLength={280}
+          rows={1}
+          style={{
+            flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 20, padding: "10px 16px", color: "var(--cream)", fontSize: 14,
+            resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4,
+            maxHeight: 100, overflowY: "auto",
+          }}
+        />
+        <button onClick={sendMessage} disabled={!input.trim() || sending}
+          style={{
+            background: input.trim() ? "var(--accent)" : "rgba(255,255,255,0.08)",
+            border: "none", borderRadius: "50%", width: 40, height: 40, cursor: input.trim() ? "pointer" : "not-allowed",
+            fontSize: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "background 0.2s",
+          }}>
+          ➤
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function NewsroomTab() {
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -1993,9 +2654,9 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase("hold"), 600);
-    const t2 = setTimeout(() => setPhase("out"), 8000);
-    const t3 = setTimeout(() => onDone(), 8800);
+    const t1 = setTimeout(() => setPhase("hold"), 400);
+    const t2 = setTimeout(() => setPhase("out"), 4000);
+    const t3 = setTimeout(() => onDone(), 4600);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onDone]);
 
@@ -2003,22 +2664,22 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
     <div style={{
       position: "fixed", inset: 0, zIndex: 99999,
       display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center",
-      background: "#071510",
+      background: "#05080f",
       opacity: phase === "in" ? 0 : phase === "hold" ? 1 : 0,
-      transition: phase === "in" ? "opacity 600ms ease" : "opacity 800ms ease",
+      transition: phase === "in" ? "opacity 400ms ease" : "opacity 600ms ease",
       overflow: "hidden",
     }}>
       {bgImage && (
         <div style={{
           position: "absolute", inset: 0,
           backgroundImage: `url(${bgImage})`,
-          backgroundSize: "cover", backgroundPosition: "right center",
-          opacity: 0.80, filter: "none",
+          backgroundSize: "cover", backgroundPosition: "center 30%",
+          opacity: 0.55, filter: "none",
         }} />
       )}
       <div style={{
         position: "absolute", inset: 0,
-        background: "linear-gradient(135deg, rgba(7,21,16,0.92) 0%, rgba(15,35,24,0.85) 50%, rgba(7,21,16,0.92) 100%)",
+        background: "linear-gradient(135deg, rgba(5,8,15,0.88) 0%, rgba(10,16,32,0.78) 50%, rgba(5,8,15,0.88) 100%)",
       }} />
       <div style={{ position: "relative", textAlign: "center" as const, padding: "0 32px", maxWidth: 500 }}>
         <div style={{ marginBottom: 24, display: "flex", justifyContent: "center", filter: "drop-shadow(0 0 20px rgba(201,168,76,0.5))" }}><TexasIcon size={64} color="#c9a84c" /></div>
@@ -2028,18 +2689,18 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
           color: "#c9a84c", lineHeight: 1.3, marginBottom: 12,
           textShadow: "0 2px 20px rgba(201,168,76,0.3)",
         }}>
-          A Tradition Unlike Any Other
+          U.S. Open Championship
         </div>
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
-          color: "rgba(240,233,214,0.7)", letterSpacing: "0.18em",
+          color: "rgba(232,238,248,0.7)", letterSpacing: "0.18em",
           textTransform: "uppercase" as const, marginBottom: 6,
         }}>
-          The Masters Tournament
+          Shinnecock Hills Golf Club
         </div>
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
-          color: "rgba(240,233,214,0.5)", letterSpacing: "0.22em",
+          color: "rgba(232,238,248,0.5)", letterSpacing: "0.22em",
           textTransform: "uppercase" as const, marginBottom: 40,
           textAlign: "center" as const,
         }}>
@@ -2055,30 +2716,11 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
         </div>
         <div style={{
           fontFamily: "Playfair Display, EB Garamond, serif",
-          fontSize: 20, fontWeight: 600, color: "rgba(240,233,214,0.9)",
+          fontSize: 20, fontWeight: 600, color: "rgba(232,238,248,0.9)",
           letterSpacing: "0.06em", marginBottom: 32,
         }}>
           Patterson Inc.
         </div>
-        <button
-          onClick={onUnmute}
-          style={{
-            background: muted ? "rgba(201,168,76,0.12)" : "rgba(93,186,126,0.15)",
-            border: `1px solid ${muted ? "rgba(201,168,76,0.35)" : "rgba(93,186,126,0.4)"}`,
-            borderRadius: 30, padding: "8px 20px", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 8, margin: "0 auto",
-            transition: "all 0.3s ease",
-          }}
-        >
-          <span style={{ fontSize: 16 }}>{muted ? "🔇" : "🔊"}</span>
-          <span style={{
-            fontFamily: "EB Garamond, serif", fontSize: 13,
-            color: muted ? "rgba(201,168,76,0.8)" : "rgba(93,186,126,0.9)",
-            letterSpacing: "0.08em",
-          }}>
-            {muted ? "Tap to unmute" : "Playing..."}
-          </span>
-        </button>
       </div>
     </div>
   );
@@ -2086,13 +2728,19 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
 
 // ─── Round Leader Banner ──────────────────────────────────────────────────────
 // ─── Pool Usage Ticker ────────────────────────────────────────────────────────
-function PoolUsageTicker({ picks, registeredUsers }: { picks: Pick[]; registeredUsers: { id: string; username: string }[] }) {
+function PoolUsageTicker({ picks, registeredUsers, tournament }: { picks: Pick[]; registeredUsers: { id: string; username: string }[]; tournament: Tournament }) {
   const totalUsers = registeredUsers.length;
-  if (!totalUsers || !picks.length) return null;
+  if (!totalUsers) return null;
 
-  // Count how many distinct users have picked each golfer across all rounds
+  // Only count picks from revealed rounds — don't spoil unrevealed picks
+  const revealedRounds = [1, 2, 3, 4].filter(r => isRoundRevealed(tournament, r));
+  const revealedPicks = picks.filter(p => revealedRounds.includes(p.round_number));
+
+  if (!revealedPicks.length) return null;
+
+  // Count how many distinct users have picked each golfer across revealed rounds
   const golferUsers: Record<string, Set<string>> = {};
-  picks.forEach(p => {
+  revealedPicks.forEach(p => {
     if (!golferUsers[p.golfer]) golferUsers[p.golfer] = new Set();
     golferUsers[p.golfer].add(p.user_id);
   });
@@ -2476,46 +3124,19 @@ export default function Page() {
     setToasts(q => q.filter(t => t.id !== id));
   }
   const musicRef = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize audio once
-  useEffect(() => {
-    // Try multiple sources in order
-    const sources = [
-      "/masters-theme.mp3",
-    ];
-    const audio = new Audio();
-    audio.volume = 0.35;
-    audio.loop = true;
-    // Try each source until one loads
-    let srcIndex = 0;
-    const tryNext = () => {
-      if (srcIndex >= sources.length) return;
-      audio.src = sources[srcIndex++];
-      audio.load();
-    };
-    audio.addEventListener("error", tryNext);
-    tryNext();
-    musicRef.current = audio;
-    return () => { audio.pause(); };
-  }, []);
-
-  function handleUnmute() {
-    if (!musicRef.current) return;
-    musicRef.current.play().catch(() => {});
-    setMusicMuted(false);
-  }
-
-  function handleMuteToggle() {
-    if (!musicRef.current) return;
-    if (musicMuted) {
-      musicRef.current.play().catch(() => {});
-      setMusicMuted(false);
-    } else {
-      musicRef.current.pause();
-      setMusicMuted(true);
-    }
-  }
+  // Music disabled for U.S. Open Championship
+  function handleUnmute() {}
+  function handleMuteToggle() {}
   const tournament = getActiveTournament();
+  // Compute current round — never show R4 before the tournament starts
+  const computedRound = (() => {
+    const override = adminOverrides.roundOverride;
+    if (override) return override;
+    const now = new Date();
+    const r1Start = new Date(tournament.rounds[1].date + "T11:00:00Z"); // 6am CT = 11am UTC
+    if (now < r1Start) return 1; // Pre-tournament: always R1
+    return getCurrentRound(tournament);
+  })();
   const th = tournament.theme;
 
   useEffect(() => {
@@ -2524,7 +3145,17 @@ export default function Page() {
     const id = localStorage.getItem("mp_userId");
     if (t && u && id) {
       setToken(t); setUsername(u); setUserId(id);
-      // Show splash once per session even if already logged in
+      // Silently refresh token on every app load — keeps it valid for another 30 days
+      // This means users who open the app regularly will never see an expired token
+      fetch("/api/refresh", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${t}` },
+      }).then(r => r.ok ? r.json() : null).then(data => {
+        if (data?.token) {
+          localStorage.setItem("mp_token", data.token);
+          setToken(data.token);
+        }
+      }).catch(() => {}); // silent — don't disrupt app load if refresh fails
       if (!sessionStorage.getItem("mp_splash_shown")) {
         setShowSplash(true);
       }
@@ -2572,7 +3203,18 @@ export default function Page() {
       setScores(newScores);
       setOdds(oddsData.odds ?? {});
       setPlayerCount(playersData.count ?? 0);
-      setRegisteredUsers(newUsers);
+      // If users came back empty, retry once directly
+      if (newUsers.length === 0) {
+        try {
+          const retry = await fetch("/api/users", { headers: { Authorization: `Bearer ${t}` } });
+          if (retry.ok) {
+            const rd = await retry.json();
+            setRegisteredUsers(rd.users ?? []);
+          }
+        } catch { /* ignore */ }
+      } else {
+        setRegisteredUsers(newUsers);
+      }
       setAdminOverrides(overridesData ?? {});
       setPickStatus(pickStatusData.status ?? {});
 
@@ -2818,7 +3460,7 @@ export default function Page() {
             fontWeight: tab === t ? 600 : 400, transition: "all 0.2s", whiteSpace: "nowrap" as const,
           }}>
             {t === "picks" ? "🎯 My Picks"
-              : t === "leaderboard" ? "🪙 Pick'em Leaderboard"
+              : t === "leaderboard" ? "🪙 Leaderboard 💬"
               : t === "tournament" ? "⛳ Tournament"
               : t === "history" ? "📜 History"
               : t === "course" ? "🔍 Course Guide"
@@ -2831,18 +3473,18 @@ export default function Page() {
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
       {/* Pool usage ticker */}
-      <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} />
+      <PoolUsageTicker picks={picks} registeredUsers={registeredUsers} tournament={tournament} />
 
       {/* Content */}
-      <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 12px" }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 12px" }}>
         {tab === "picks" && token && userId && (
-          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
+          <MyPicksTab token={token} userId={userId} tournament={tournament} allPicks={picks} scores={scores} odds={odds} currentRound={computedRound} revealAll={!!adminOverrides.revealAll} skipDeadline={!!adminOverrides.skipDeadline} onPicksChanged={() => fetchData(token)} />
         )}
         {tab === "leaderboard" && (
-          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={adminOverrides.roundOverride ?? getCurrentRound(tournament)} pickStatus={pickStatus} />
+          <LeaderboardTab tournament={tournament} allPicks={picks} scores={scores} playerCount={playerCount} registeredUsers={registeredUsers} currentRound={computedRound} pickStatus={pickStatus} userId={userId ?? ""} username={username ?? ""} />
         )}
         {tab === "tournament" && (
-          <TournamentLeaderboardTab scores={scores} />
+          <TournamentLeaderboardTab scores={scores} tournament={tournament} />
         )}
         {tab === "history" && (
           <HistoryTab tournament={tournament} allPicks={picks} scores={scores} />
