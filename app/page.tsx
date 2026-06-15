@@ -199,6 +199,32 @@ const COURSE_DATA: Record<string, { name: string; location: string; par: number;
       { hole:18, name:"The Wanamaker",  par:4, yards:465, description:"The championship closer. Named for the Wanamaker Trophy sitting in the clubhouse directly behind the green, this uphill par-4 requires a precise drive between bunkers and a bold approach to a green protected by a deep front bunker. With the gallery packed ten-deep, it's the most electric finish in major golf this week.", notes:"The last putt here decides who lifts the Wanamaker Trophy." },
     ],
   },
+  usopen: {
+    name: "Shinnecock Hills Golf Club",
+    location: "Southampton, New York",
+    par: 70,
+    yards: 7445,
+    holes: [
+      { hole:1,  name:"The Opener",         par:4, yards:393, description:"A downhill opener that lulls players into a false sense of security. The prevailing ocean winds turn Shinnecock into an entirely different course by the afternoon. Approach is uphill to a small, firm green that feeds everything left.", notes:"Play conservative. The course gets harder from here." },
+      { hole:2,  name:"The Valley",          par:4, yards:450, description:"Long par-4 playing into the ocean breeze. The fairway tilts right, funneling errant drives into thick fescue. The green is severely undulated — putts from above the hole are nearly unplayable.", notes:"Take the iron off the tee if the wind is up. No bogey here." },
+      { hole:3,  name:"The Ridge",           par:3, yards:189, description:"Classic links-style par-3 playing across a ridge into a raised green. The wind swirls unpredictably on the plateau — what looks like a 7-iron becomes a 5-iron in seconds. Short is dead, long is dead.", notes:"Pick a club, commit, and accept the result." },
+      { hole:4,  name:"The Long Road",       par:4, yards:428, description:"Dogleg right requiring a precise drive to the left side to open the approach. The green sits above the fairway on a shelf — missing right leaves an impossible up-and-down. The rough at Shinnecock is penal all week.", notes:"Par here in afternoon conditions is a victory." },
+      { hole:5,  name:"The Cape",            par:5, yards:537, description:"The only par-5 on the front. Reachable in two but only from a perfect drive. The green is surrounded by bunkers and falls off sharply — going for it in two is all or nothing. Layup to 100 yards gives a birdie chance.", notes:"The easiest birdie opportunity on the course. Don't waste it." },
+      { hole:6,  name:"The Redan",           par:3, yards:202, description:"A pure redan hole — green angled left to right, the slope pulling the ball away from the flag. Players must aim left and let the wind and slope work the ball toward the hole. Fighting the slope produces bogey.", notes:"Trust the slope. Don't go right of the flag under any circumstances." },
+      { hole:7,  name:"The Long Hole",       par:4, yards:474, description:"The hardest hole on the front nine. Dead into the prevailing ocean wind, playing closer to 520 yards on breezy afternoons. The green is small and crowned — any shot not perfectly struck rolls off into thick fescue.", notes:"Par is a great score. Bogey here is recoverable. Double is not." },
+      { hole:8,  name:"The Short Road",      par:4, yards:390, description:"Shorter par-4 but deceivingly difficult. Wind changes direction here as the course bends. Aggressive play off the tee can leave a simple wedge — but the small, firm green repels anything not hit precisely on the right trajectory.", notes:"Birdie opportunity if the wind cooperates. Go for it." },
+      { hole:9,  name:"The Turn",            par:4, yards:438, description:"The front nine closer plays back toward the clubhouse. Downwind hole that sets up birdie chances for long hitters. The approach is from a downhill lie to a green that opens up from the left — a birdie here going into the turn is worth double.", notes:"Push hard for birdie. The back nine is brutal." },
+      { hole:10, name:"The Homeward Hole",   par:4, yards:408, description:"The back nine opener is one of the most beautiful holes in American golf. Playing toward the ocean horizon with the Atlantic visible in the background, the fairway ripples over ancient sand dunes. The approach plays downhill to a green cut into a hillside.", notes:"Breathtaking setting. Stay focused — it's not over." },
+      { hole:11, name:"The Hill",            par:4, yards:454, description:"Long uphill par-4 into the ocean breeze. One of the toughest driving holes of the week — miss right and the ball disappears into fescue; miss left and you're blocked by the hillside. The green rewards only precise iron play.", notes:"Bogey avoidance hole. Take your par and move on." },
+      { hole:12, name:"The Highland",        par:4, yards:462, description:"Elevated tee shot playing across rolling fescue-covered terrain. The fairway is generous but deceptive — what looks level plays severely downhill. The approach is a blind shot over a rise to a putting surface that slopes away dramatically.", notes:"Club up on the approach. The green is faster than it looks." },
+      { hole:13, name:"The Wreck",           par:4, yards:378, description:"Short par-4 with a drivable element for big hitters. But Shinnecock punishes aggression — the fairway is surrounded by deep fescue rough and bunkers that have claimed countless balls over the years. A precise iron off the tee is usually smarter.", notes:"Resist the driver. Smart 3-wood into the fairway, wedge, birdie." },
+      { hole:14, name:"The Plateau",         par:3, yards:197, description:"Mid-iron par-3 to a plateau green perched above the fairway. The most exposed hole on the course to wind — plays dramatically different every hour. Three tiers on the green make two-putting from the wrong tier nearly impossible.", notes:"Get the yardage right. Three putts from the top tier to the bottom are 70 feet." },
+      { hole:15, name:"The Road Home",       par:4, yards:421, description:"One of Shinnecock's defining holes. The fairway narrows at driving distance between deep fescue on both sides. The approach to a sharply bunkered green must thread a precise window — anything off-line faces a near-impossible recovery in US Open rough.", notes:"The hardest approach shot of the week. Aim at the center of the green every time." },
+      { hole:16, name:"The Ocean",           par:4, yards:522, description:"The longest par-4 in US Open history on some setups. Playing directly into the ocean wind off Southampton Sound, this hole has broken more tournament aspirations than any other. Dead straight into the gale, anything over par here feels catastrophic.", notes:"This hole has decided US Opens. Bogey and walk away. Don't make double." },
+      { hole:17, name:"The Short",           par:3, yards:179, description:"Downwind par-3 over a deep depression to a small green cut into a hillside. The only real scoring hole on the back nine. Playing downwind the club selection is deceptively short — players routinely take too much club and fly the green into thick rough.", notes:"Take one less club than you think. This is where birdies are made on Sunday." },
+      { hole:18, name:"The Home",            par:4, yards:453, description:"Shinnecock's legendary closer. The massive clubhouse looms directly behind the green as players make their final approach. The fairway is generous off the tee but the prevailing crosswind pushes everything right. The approach must carry a ridge and stop quickly on a two-tiered green. In US Open history this hole has decided championships on Sunday afternoon more than any other closing hole in the game.", notes:"The clubhouse crowd will be electric. Make your swing, trust your prep. This is what it's all for." },
+    ],
+  },
 };
 
 function getCourseData(tournamentId: string) {
@@ -2663,14 +2689,14 @@ function MastersSplash({ onDone, bgImage, audioRef, muted, onUnmute }: {
           color: "#c9a84c", lineHeight: 1.3, marginBottom: 12,
           textShadow: "0 2px 20px rgba(201,168,76,0.3)",
         }}>
-          PGA Championship
+          U.S. Open Championship
         </div>
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
           color: "rgba(232,238,248,0.7)", letterSpacing: "0.18em",
           textTransform: "uppercase" as const, marginBottom: 6,
         }}>
-          Aronimink Golf Club
+          Shinnecock Hills Golf Club
         </div>
         <div style={{
           fontFamily: "EB Garamond, serif", fontSize: 15,
@@ -3098,7 +3124,7 @@ export default function Page() {
     setToasts(q => q.filter(t => t.id !== id));
   }
   const musicRef = useRef<HTMLAudioElement | null>(null);
-  // Music disabled for PGA Championship
+  // Music disabled for U.S. Open Championship
   function handleUnmute() {}
   function handleMuteToggle() {}
   const tournament = getActiveTournament();
