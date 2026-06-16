@@ -192,9 +192,11 @@ export async function GET(request: Request) {
   const tournamentOver = endDate ? new Date() > new Date(endDate) : false;
   const tournamentStarted = startDate ? new Date() >= new Date(startDate) : true;
 
-  // Before tournament starts — don't serve any cached scores (could be stale from another event)
+  // Before tournament starts — return static field with E scores, don't hit ESPN
   if (!tournamentStarted) {
-    return NextResponse.json({ scores: [], source: "pre_tournament" });
+    const { staticPlayersAsScores } = await import("@/lib/golfers");
+    const staticField = staticPlayersAsScores();
+    return NextResponse.json({ scores: staticField, source: "pre_tournament_static" });
   }
 
   if (tournamentOver && cachedScores.length > 0) {
