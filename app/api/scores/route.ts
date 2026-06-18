@@ -11,44 +11,41 @@ export interface GolferScore {
   teeTime: string | null; thru: string | null; worldRank: number | null;
 }
 
-const PAR = 72; // Masters par
+const PAR_BY_TOURNAMENT: Record<string, number> = {
+  masters: 72,
+  pga:     70,
+  usopen:  70,
+  theopen: 71,
+};
 
 /**
  * Convert an ESPN score string to to-par integer.
  * ESPN linescores[n].value = raw strokes ("68") or to-par ("-4","E","+2").
  * Raw strokes are always > 50. To-par values are in range [-20, +30].
  */
-function toPar(val: unknown): number | null {
+function toPar(val: unknown, par = 72): number | null {
   if (val === null || val === undefined) return null;
   const s = String(val).trim();
   if (!s || s === "--") return null;
   if (s === "E") return 0;
   const n = parseInt(s, 10);
   if (isNaN(n)) return null;
-  // Raw strokes (e.g. 68) → convert to to-par. To-par values never exceed 50.
-  return n > 50 ? n - PAR : n;
+  return n > 50 ? n - par : n;
 }
 
-/**
- * Convert ESPN's cumulative score string to to-par.
- * comp.score is typically already to-par ("-8","E","+2") but can be raw strokes.
- * We check the individual round scores to determine which.
- */
-function toParTotal(rawScore: unknown, roundScores: (number|null)[]): number {
+function toParTotal(rawScore: unknown, roundScores: (number|null)[], par = 72): number {
   if (rawScore === "E" || rawScore === 0) return 0;
   const s = String(rawScore ?? "").trim();
   if (!s || s === "--") {
-    // Derive from rounds
     return roundScores.reduce((sum: number, r) => sum + (r ?? 0), 0);
   }
   const n = parseInt(s, 10);
   if (isNaN(n)) return 0;
   const played = roundScores.filter(r => r !== null).length;
-  // If n > 50 it's raw total strokes — subtract par for each round played
-  return n > 50 && played > 0 ? n - PAR * played : n;
+  return n > 50 && played > 0 ? n - par * played : n;
 }
 
-function parseESPN(data: unknown): GolferScore[] {
+function parseESPN(data: unknown, par: number): GolferScore[] {
   const players: GolferScore[] = [];
   try {
     const d = data as Record<string, unknown>;
@@ -70,10 +67,10 @@ function parseESPN(data: unknown): GolferScore[] {
       linescores.forEach((ls, i) => {
         if (i >= 4) return;
         const l = ls as Record<string, unknown>;
-        rounds[i] = toPar(l.displayValue) ?? toPar(l.value);
+        rounds[i] = toPar(l.displayValue, par) ?? toPar(l.value, par);
       });
 
-      const totalScore = toParTotal(comp.score, rounds);
+      const totalScore = toParTotal(comp.score, rounds, par);
       const headshotObj = athlete.headshot as Record<string, unknown> | undefined;
 
       let teeTime: string | null = null;
@@ -115,7 +112,7 @@ function parseESPN(data: unknown): GolferScore[] {
   return players;
 }
 
-async function fetchFromESPN(): Promise<GolferScore[]> {
+async function fetchFromESPN(par: number): Promise<GolferScore[]> {
   // Try specific Masters 2026 event ID first (returns full 91-player field)
   // Fall back to generic PGA endpoint
   const urls = [
@@ -134,7 +131,7 @@ async function fetchFromESPN(): Promise<GolferScore[]> {
       });
       clearTimeout(t);
       if (!res.ok) continue;
-      const parsed = parseESPN(await res.json());
+      const parsed = parseESPN(await res.json(), par);
       console.log(`ESPN ${url.slice(-30)}: ${parsed.length} players`);
       if (parsed.length > 0) return parsed;
     } catch (e) {
@@ -212,7 +209,8 @@ export async function GET(request: Request) {
   }
 
   // Live fetch from ESPN
-  const live = await fetchFromESPN();
+  const par = PAR_BY_TOURNAMENT[tournament] ?? 72;
+  const live = await fetchFromESPN(par);
 
   if (live.length > 0) {
     await supabase.from("score_cache").upsert({
