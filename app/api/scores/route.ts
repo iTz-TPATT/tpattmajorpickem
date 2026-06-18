@@ -233,3 +233,4 @@ export async function GET(request: Request) {
   if (debug) return NextResponse.json({ scores: staticScores, source: "static_fallback", count: staticScores.length });
   return NextResponse.json({ scores: staticScores, source: "static_fallback" });
 }
+
