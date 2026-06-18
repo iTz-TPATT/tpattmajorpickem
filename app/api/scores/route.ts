@@ -117,7 +117,7 @@ async function fetchFromESPN(par: number): Promise<GolferScore[]> {
   // Fall back to generic PGA endpoint
   const urls = [
     "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=usopen", // US Open — USGA event, separate from PGA Tour
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401580366", // US Open 2026 Shinnecock Hills fallback
+   "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=usopen&event=401811952", // US Open 2026 Shinnecock Hills fallback
     "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
   ];
   for (const url of urls) {
