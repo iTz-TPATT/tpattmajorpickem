@@ -186,7 +186,7 @@ export default function AdminPage() {
       // Fetch live scores from ESPN — always use /api/scores for admin so we get the real field
       let liveScores: GolferScore[] = [];
       try {
-        const scoresRes = await fetch("/api/scores?tournament=masters");
+        const scoresRes = await fetch(`/api/scores?tournament=${selectedTournament}`);
         if (scoresRes.ok) {
           const sd = await scoresRes.json();
           liveScores = sd.scores ?? [];

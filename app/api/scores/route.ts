@@ -116,9 +116,9 @@ async function fetchFromESPN(par: number): Promise<GolferScore[]> {
   // Try specific Masters 2026 event ID first (returns full 91-player field)
   // Fall back to generic PGA endpoint
   const urls = [
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=usopen", // US Open — USGA event, separate from PGA Tour
-   "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=usopen&event=401811952", // US Open 2026 Shinnecock Hills fallback
-    "https://site.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?tournamentId=401811952", // US Open 2026 Shinnecock Hills — primary
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=usopen",           // US Open generic fallback
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811952", // PGA Tour fallback with correct event ID
   ];
   for (const url of urls) {
     try {
@@ -233,4 +233,3 @@ export async function GET(request: Request) {
   if (debug) return NextResponse.json({ scores: staticScores, source: "static_fallback", count: staticScores.length });
   return NextResponse.json({ scores: staticScores, source: "static_fallback" });
 }
-
